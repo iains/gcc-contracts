@@ -12115,12 +12115,13 @@ tsubst_contract (tree decl, tree t, tree args, tsubst_flags_t complain,
 
   tree r = copy_node (t);
 
-  /* Rebuild the result variable.  */
+  /* Rebuild the result variable, if present.  */
+  tree oldvar = NULL_TREE;
+  tree newvar = NULL_TREE;
   if (type && POSTCONDITION_P (t) && POSTCONDITION_IDENTIFIER (t))
     {
-      tree oldvar = POSTCONDITION_IDENTIFIER (t);
-
-      tree newvar = copy_node (oldvar);
+      oldvar = POSTCONDITION_IDENTIFIER (t);
+      newvar = copy_node (oldvar);
       TREE_TYPE (newvar) = type;
       DECL_CONTEXT (newvar) = decl;
       POSTCONDITION_IDENTIFIER (r) = newvar;
@@ -12130,25 +12131,52 @@ tsubst_contract (tree decl, tree t, tree args, tsubst_flags_t complain,
       if (!auto_p)
 	if (!check_postcondition_result (decl, type, loc))
 	  return invalidate_contract (r);
-
-      /* Make the variable available for lookup.  */
-      register_local_specialization (newvar, oldvar);
     }
 
   /* Instantiate the condition.  If the return type is undeduced, process
      the expression as if inside a template to avoid spurious type errors.  */
+  begin_scope (sk_contract, decl);
+  bool old_pc = processing_postcondition;
+  bool old_const = should_constify_contract;
+  processing_postcondition = POSTCONDITION_P (t);
+  /* Should we const-ify this condition?  */
+  should_constify_contract =  get_contract_const (t);
   if (auto_p)
     ++processing_template_decl;
-  ++processing_contract_condition;
-  CONTRACT_CONDITION (r)
-      = tsubst_expr (CONTRACT_CONDITION (t), args, complain, in_decl);
-  --processing_contract_condition;
-  if (auto_p)
-    --processing_template_decl;
+  if (newvar)
+    /* Make the variable available for lookup.  */
+    register_local_specialization (newvar, oldvar);
+
+  /* Contract conditions have a wider application of location wrappers than
+     other trees which will not work with the generic handling in tsubst_expr,
+     remove the wrapper here...  */
+  location_t cond_l = EXPR_LOCATION (CONTRACT_CONDITION (t));
+  tree cond_t = tree_strip_any_location_wrapper (CONTRACT_CONDITION (t));
+
+  /* ... and substitute with the contained expression.  */
+  cond_t = tsubst_expr (cond_t, args, complain, in_decl);
+
+  /* Converted to bool, if possible, and then re-apply a location wrapper
+     when required.  */
+  cp_expr new_condition (cond_t, cond_l);
+  CONTRACT_CONDITION (r) = finish_contract_condition (new_condition);
 
   /* And the comment.  */
+  /* TODO : this does not do anything at the moment. The CONTRACT_COMMENT is
+     (currently) a string literal, built from the string of the contract.
+     There is nothing to substitute. If we wanted to rebuild the
+     CONTRACT_COMMENT from the substituted contract tree, we would need to
+     modify how a CONTRACT_COMMENT is built.  */
   CONTRACT_COMMENT (r)
       = tsubst_expr (CONTRACT_COMMENT (r), args, complain, in_decl);
+
+  if (auto_p)
+    --processing_template_decl;
+  processing_postcondition = old_pc;
+  should_constify_contract = old_const;
+  gcc_checking_assert (scope_chain && scope_chain->bindings
+		       && scope_chain->bindings->kind == sk_contract);
+  pop_bindings_and_leave_scope ();
 
   return r;
 }
@@ -12196,19 +12224,27 @@ tsubst_contract_attribute (tree decl, tree t, tree args,
   TREE_VALUE (t) = build_tree_list (NULL_TREE, contract);
 }
 
-/* Rebuild the attribute list for DECL, substituting into contracts
-   as needed.  */
+/* For unsubstituted list of contracts in ATTRIBUTES, instantiate contracts
+ for DECL and set the list as contracts for decl. Original attributes are not
+ modified. Substitution creates a deep copy of the contract.
+ Note that ATTRIBUTES may contain attributes other than contracts, and that
+ they may belong to a decl other than DECL.
+ */
 
 void
-tsubst_contract_attributes (tree decl, tree args, tsubst_flags_t complain, tree in_decl)
+tsubst_contract_attributes (tree attributes, tree decl, tree args,
+			    tsubst_flags_t complain, tree in_decl)
 {
-  tree list = copy_list (DECL_ATTRIBUTES (decl));
-  for (tree attr = list; attr; attr = CONTRACT_CHAIN (attr))
-    {
-      if (cxx_contract_attribute_p (attr))
-	tsubst_contract_attribute (decl, attr, args, complain, in_decl);
-    }
-  DECL_ATTRIBUTES (decl) = list;
+  tree subst_contract_list = NULL_TREE;
+  for (tree attr = find_contract (attributes); attr;
+      attr = CONTRACT_CHAIN (attr))
+  {
+      tree nc = copy_node (attr);
+      tsubst_contract_attribute (decl, nc, args, complain, in_decl);
+      TREE_CHAIN (nc) = subst_contract_list;
+      subst_contract_list = nc;
+  }
+  set_contract_attributes(decl, nreverse(subst_contract_list));
 }
 
 /* Instantiate a single dependent attribute T (a TREE_LIST), and return either
@@ -22181,7 +22217,8 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	      /* This can happen for a parameter name used later in a function
 		 declaration (such as in a late-specified return type).  Just
 		 make a dummy decl, since it's only used for its type.  */
-	      gcc_assert (cp_unevaluated_operand);
+	      gcc_assert (cp_unevaluated_operand
+			  || processing_postcondition);
 	      r = tsubst_decl (t, args, complain);
 	      /* Give it the template pattern as its context; its true context
 		 hasn't been instantiated yet and this is good enough for
@@ -22278,6 +22315,7 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	    /* If the original type was a reference, we'll be wrapped in
 	       the appropriate INDIRECT_REF.  */
 	    r = convert_from_reference (r);
+
 	}
       RETURN (r);
 
@@ -22591,6 +22629,12 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 	if (REF_PARENTHESIZED_P (t))
 	  /* force_paren_expr can also create a VIEW_CONVERT_EXPR.  */
 	  RETURN (finish_parenthesized_expr (op));
+
+	maybe_reject_param_in_postcondition (op, EXPR_LOCATION (t));
+
+	if (flag_contracts_nonattr && should_constify_contract
+	    && processing_contract_condition)
+	    op = constify_contract_access(op);
 
 	/* Otherwise, we're dealing with a wrapper to make a C++20 template
 	   parameter object const.  */
@@ -27527,17 +27571,18 @@ regenerate_decl_from_template (tree decl, tree tmpl, tree args)
 
       if (DECL_CONTRACTS (decl))
 	{
+	  tree attributes = DECL_ATTRIBUTES (decl);
 	  /* If we're regenerating a specialization, the contracts will have
 	     been copied from the most general template. Replace those with
 	     the ones from the actual specialization.  */
 	  tree tmpl = DECL_TI_TEMPLATE (decl);
 	  if (DECL_TEMPLATE_SPECIALIZATION (tmpl))
 	    {
-	      remove_contract_attributes (decl);
-	      copy_contract_attributes (decl, code_pattern);
+	      attributes = DECL_ATTRIBUTES(code_pattern);
 	    }
 
-	  tsubst_contract_attributes (decl, args, tf_warning_or_error, code_pattern);
+	  tsubst_contract_attributes (attributes, decl, args,
+				      tf_warning_or_error, code_pattern);
 	}
 
       /* Merge additional specifiers from the CODE_PATTERN.  */

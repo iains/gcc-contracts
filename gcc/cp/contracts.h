@@ -22,6 +22,8 @@ along with GCC; see the file COPYING3.  If not see
 #ifndef GCC_CP_CONTRACT_H
 #define GCC_CP_CONTRACT_H
 
+#include <cstdint>
+
 /* Contract levels approximate the complexity of the expression.  */
 
 enum contract_level
@@ -32,15 +34,36 @@ enum contract_level
   CONTRACT_AXIOM
 };
 
-/* The concrete semantics determine the behavior of a contract.  */
+/* The concrete semantics determine the behavior of a contract.
+   CCS_IGNORE -> ignore
+   CCS_MAYBE  -> observe
+   CCS_NEVER  -> enforce
+   CCS_QUICK  -> quick_enforce
+   CCS_NOEXCEPT_ENFORCE -> noexcept_enforce
+   CCS_NOEXCEPT_OBSERVE -> noexcept_observe
+*/
 
 enum contract_semantic
 {
-  CCS_INVALID,
-  CCS_IGNORE,
-  CCS_ASSUME,
-  CCS_NEVER,
-  CCS_MAYBE
+  CCS_INVALID = 0,
+  CCS_IGNORE = 1,
+  CCS_ASSUME = 2,
+  CCS_NEVER = 3,
+  CCS_ENFORCE = CCS_NEVER,
+  CCS_MAYBE = 4,
+  CCS_OBSERVE = CCS_MAYBE,
+  CCS_QUICK = 5,
+  CCS_NOEXCEPT_ENFORCE,
+  CCS_NOEXCEPT_OBSERVE
+};
+
+/* Contract inheritance model.  */
+
+enum contract_inheritance
+{
+  CONTRACTS_ON_VIRTUALS_NONE = 0,
+  CONTRACTS_ON_VIRTUALS_P2900R13 = 1,
+  CONTRACTS_ON_VIRTUALS_P3653 = 2,
 };
 
 /* True if the contract is unchecked.  */
@@ -73,6 +96,36 @@ struct contract_role
   contract_semantic default_semantic;
   contract_semantic audit_semantic;
   contract_semantic axiom_semantic;
+};
+
+/* P2900+ contract clasification */
+/* Must match relevant enums in <contracts> header  */
+
+enum contract_assertion_kind : uint16_t {
+  CAK_INVALID = 0 ,
+  CAK_PRE = 1 ,
+  CAK_POST = 2 ,
+  CAK_ASSERT = 3
+};
+
+/* Per P2900R14 + D3290R3 + extensions.  */
+enum contract_evaluation_semantic : uint16_t {
+  CES_INVALID = 0,
+  CES_IGNORE = 1,
+  CES_OBSERVE = 2,
+  CES_ENFORCE = 3,
+  CES_QUICK = 4,
+
+  // These should start at 1000
+  CES_NOEXCEPT_ENFORCE = 5,
+  CES_NOEXCEPT_OBSERVE = 6,
+  CES_FORCE_QUICK = 7,
+};
+
+enum detection_mode : uint16_t {
+  CDM_UNSPECIFIED = 0,
+  CDM_PREDICATE_FALSE = 1,
+  CDM_EVAL_EXCEPTION = 2
 };
 
 /* Information for configured contract semantics.  */
@@ -170,6 +223,13 @@ enum contract_matching_context
   cmc_override
 };
 
+enum contract_match_kind
+{
+  cmk_all,
+  cmk_pre,
+  cmk_post
+};
+
 /* True if NODE is any kind of contract.  */
 #define CONTRACT_P(NODE)			\
   (TREE_CODE (NODE) == ASSERTION_STMT		\
@@ -238,10 +298,6 @@ enum contract_matching_context
 #define CONTRACT_LEVEL(NODE)		\
   (TREE_VALUE (CONTRACT_MODE (NODE)))
 
-/* The identifier denoting the role of the contract */
-#define CONTRACT_ROLE(NODE)		\
-  (TREE_PURPOSE (CONTRACT_MODE (NODE)))
-
 /* The parsed condition of the contract.  */
 #define CONTRACT_CONDITION(NODE) \
   (TREE_OPERAND (CONTRACT_CHECK (NODE), 1))
@@ -269,37 +325,45 @@ enum contract_matching_context
 #define DECL_POST_FN(NODE) \
   (get_postcondition_function ((NODE)))
 
+/* For a FUNCTION_DECL of a guarded function, this holds the function decl
+   where caller contract checks are emitted.  */
+#define DECL_WRAPPER_FN(NODE) \
+  (get_contract_wrapper_function ((NODE)))
+
 /* True iff the FUNCTION_DECL is the pre function for a guarded function.  */
 #define DECL_IS_PRE_FN_P(NODE) \
-  (DECL_ABSTRACT_ORIGIN (NODE) && DECL_PRE_FN (DECL_ABSTRACT_ORIGIN (NODE)) == NODE)
+  (DECL_DECLARES_FUNCTION_P (NODE) && DECL_LANG_SPECIFIC (NODE) && \
+   CONTRACT_HELPER (NODE) == ldf_contract_pre)
 
 /* True iff the FUNCTION_DECL is the post function for a guarded function.  */
 #define DECL_IS_POST_FN_P(NODE) \
-  (DECL_ABSTRACT_ORIGIN (NODE) && DECL_POST_FN (DECL_ABSTRACT_ORIGIN (NODE)) == NODE)
+  (DECL_DECLARES_FUNCTION_P (NODE) && DECL_LANG_SPECIFIC (NODE) && \
+   CONTRACT_HELPER (NODE) == ldf_contract_post)
 
-extern void remove_contract_attributes		(tree);
-extern void copy_contract_attributes		(tree, tree);
-extern void remap_contracts			(tree, tree, tree, bool);
+#define DECL_IS_WRAPPER_FN_P(NODE) \
+  (DECL_DECLARES_FUNCTION_P (NODE) && DECL_LANG_SPECIFIC (NODE) && \
+   DECL_CONTRACT_WRAPPER (NODE))
+
 extern void maybe_update_postconditions		(tree);
 extern void rebuild_postconditions		(tree);
 extern bool check_postcondition_result		(tree, tree, location_t);
 extern tree get_precondition_function		(tree);
 extern tree get_postcondition_function		(tree);
-extern void duplicate_contracts			(tree, tree);
+extern tree get_contract_wrapper_function	(tree);
+extern void check_redecl_contract		(tree, tree);
 extern void match_deferred_contracts		(tree);
 extern void defer_guarded_contract_match	(tree, tree, tree);
 extern bool diagnose_misapplied_contracts	(tree);
 extern tree finish_contract_attribute		(tree, tree);
 extern tree invalidate_contract			(tree);
-extern void update_late_contract		(tree, tree, tree);
-extern tree splice_out_contracts		(tree);
 extern bool all_attributes_are_contracts_p	(tree);
-extern void inherit_base_contracts		(tree, tree);
+extern tree copy_and_remap_contracts		(tree, tree, bool, contract_match_kind);
 extern void start_function_contracts		(tree);
 extern void maybe_apply_function_contracts	(tree);
 extern void finish_function_contracts		(tree);
 extern void set_contract_functions		(tree, tree, tree);
 extern tree build_contract_check		(tree);
 extern void emit_assertion			(tree);
+extern void update_contract_arguments		(tree, tree);
 
 #endif /* ! GCC_CP_CONTRACT_H */

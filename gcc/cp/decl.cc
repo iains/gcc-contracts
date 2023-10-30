@@ -1860,6 +1860,12 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  /* Even if the types match, prefer the new declarations type
 	     for built-ins which have not been explicitly declared,
 	     for exception lists, etc...  */
+
+	  /* Contracts are currently in the attribute tree. We do not handle
+	     them here because we assume built-ins don't have contracts.  */
+	  gcc_assert(!flag_contracts ||
+		     ! (DECL_CONTRACTS(newdecl) || DECL_CONTRACTS(olddecl)));
+
 	  tree type = TREE_TYPE (newdecl);
 	  tree attribs = (*targetm.merge_type_attributes)
 	    (TREE_TYPE (olddecl), type);
@@ -2276,6 +2282,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 		 declaration of the function or function template in the
 		 translation unit."  */
 	      check_no_redeclaration_friend_default_args (olddecl, newdecl);
+
 	    }
 	}
     }
@@ -2398,7 +2405,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  = DECL_OVERLOADED_OPERATOR_CODE_RAW (olddecl);
       new_defines_function = DECL_INITIAL (newdecl) != NULL_TREE;
 
-      duplicate_contracts (newdecl, olddecl);
+      check_redecl_contract (newdecl, olddecl);
 
       /* Optionally warn about more than one declaration for the same
 	 name, but don't warn about a function declaration followed by a
@@ -2461,11 +2468,26 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 
   /* Copy all the DECL_... slots specified in the new decl except for
      any that we copy here from the old type.  */
+
+  /* Contracts are currently a part of attributes. They should not participate
+     in the merge. Strip them out before the merge and re-apply later.  */
+  tree newdecl_sc = NULL_TREE;
+  tree olddecl_sc = NULL_TREE;
+  if (TREE_CODE (olddecl) == FUNCTION_DECL)
+    olddecl_sc = remove_contract_attributes(olddecl);
+  if (TREE_CODE (newdecl) == FUNCTION_DECL)
+    newdecl_sc = remove_contract_attributes(newdecl);
+
   if (merge_attr)
     DECL_ATTRIBUTES (newdecl)
       = (*targetm.merge_decl_attributes) (olddecl, newdecl);
   else
     DECL_ATTRIBUTES (olddecl) = DECL_ATTRIBUTES (newdecl);
+
+  if (newdecl_sc)
+    set_contract_attributes(newdecl, newdecl_sc);
+  if (olddecl_sc)
+    set_contract_attributes(olddecl, olddecl_sc);
 
   if (TREE_CODE (newdecl) == TEMPLATE_DECL)
     {
@@ -2478,14 +2500,22 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
       gcc_assert (!DECL_TEMPLATE_SPECIALIZATIONS (newdecl));
 
       /* Make sure the contracts are equivalent.  */
-      duplicate_contracts (newdecl, olddecl);
+      check_redecl_contract (newdecl, olddecl);
+      tree old_result_sc = NULL_TREE;
+      tree new_result_sc = NULL_TREE;
 
-      /* Remove contracts from old_result so they aren't appended to
-	 old_result by the merge function.  */
-      remove_contract_attributes (old_result);
+      if (TREE_CODE (old_result) == FUNCTION_DECL)
+	old_result_sc = remove_contract_attributes(old_result);
+      if (TREE_CODE (new_result) == FUNCTION_DECL)
+	new_result_sc = remove_contract_attributes(new_result);
 
       DECL_ATTRIBUTES (old_result)
 	= (*targetm.merge_decl_attributes) (old_result, new_result);
+
+      if (new_result_sc)
+        set_contract_attributes(new_result, new_result_sc);
+      if (old_result_sc)
+        set_contract_attributes(old_result, old_result_sc);
 
       if (DECL_FUNCTION_TEMPLATE_P (newdecl))
 	{
@@ -2564,6 +2594,8 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  DECL_INITIAL (old_result) = DECL_INITIAL (new_result);
 	  if (DECL_FUNCTION_TEMPLATE_P (newdecl))
 	    {
+	      update_contract_arguments(new_result, old_result);
+
 	      DECL_ARGUMENTS (old_result) = DECL_ARGUMENTS (new_result);
 	      for (tree p = DECL_ARGUMENTS (old_result); p; p = DECL_CHAIN (p))
 		DECL_CONTEXT (p) = old_result;
@@ -3021,23 +3053,15 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	}
       if (! types_match || new_defines_function)
 	{
-	  /* These are the final DECL_ARGUMENTS that will be used within the
-	     body; update any references to old DECL_ARGUMENTS in the
-	     contracts, if present.  */
-	  if (tree contracts = DECL_CONTRACTS (newdecl))
-	    remap_contracts (olddecl, newdecl, contracts, true);
+
+	  /* Update the contracts to reflect the new parameter names. */
+	  update_contract_arguments(newdecl, olddecl);
 
 	  /* These need to be copied so that the names are available.
 	     Note that if the types do match, we'll preserve inline
 	     info and other bits, but if not, we won't.  */
 	  DECL_ARGUMENTS (olddecl) = DECL_ARGUMENTS (newdecl);
 	  DECL_RESULT (olddecl) = DECL_RESULT (newdecl);
-
-	  /* In some cases, duplicate_contracts will remove contracts from
-	     OLDDECL, to avoid duplications. Sometimes, the contracts end up
-	     shared. If we removed them, re-add them.  */
-	  if (!DECL_CONTRACTS (olddecl))
-	    copy_contract_attributes (olddecl, newdecl);
 	}
       /* If redeclaring a builtin function, it stays built in
 	 if newdecl is a gnu_inline definition, or if newdecl is just
@@ -3081,38 +3105,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  /* Don't clear out the arguments if we're just redeclaring a
 	     function.  */
 	  if (DECL_ARGUMENTS (olddecl))
-	    {
-	      /* If we removed contracts from previous definition, re-attach
-		 them. Otherwise, rewrite the contracts so they match the
-		 parameters of the new declaration.  */
-	      if (DECL_INITIAL (olddecl)
-		  && DECL_CONTRACTS (newdecl)
-		  && !DECL_CONTRACTS (olddecl))
-		copy_contract_attributes (olddecl, newdecl);
-	      else
-		{
-		  /* Temporarily undo the re-contexting of parameters so we can
-		     actually remap parameters.  The inliner won't replace
-		     parameters if we don't do this.  */
-		  tree args = DECL_ARGUMENTS (newdecl);
-		  for (tree p = args; p; p = DECL_CHAIN (p))
-		    DECL_CONTEXT (p) = newdecl;
-
-		  /* Save new argument names for use in contracts parsing,
-		     unless we've already started parsing the body of olddecl
-		     (particular issues arise when newdecl is from a prior
-		     friend decl with no argument names, see
-		     modules/contracts-tpl-friend-1).  */
-		  if (tree contracts = DECL_CONTRACTS (olddecl))
-		    remap_contracts (newdecl, olddecl, contracts, true);
-
-		  /* And reverse this operation again. */
-		  for (tree p = args; p; p = DECL_CHAIN (p))
-		    DECL_CONTEXT (p) = olddecl;
-		}
-
 	      DECL_ARGUMENTS (newdecl) = DECL_ARGUMENTS (olddecl);
-	    }
 	}
     }
   else if (TREE_CODE (newdecl) == NAMESPACE_DECL)
@@ -3216,6 +3209,16 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
          a version.  */
       cgraph_node::delete_function_version_by_decl (newdecl);
     }
+  /* The contracts on olddecl are now reflecting the correct argument names.
+     Preserve the contracts so they can be applied later.  */
+  tree contracts = NULL_TREE;
+  if (TREE_CODE (olddecl) == FUNCTION_DECL)
+    contracts = remove_contract_attributes(olddecl);
+
+  /* Remove contracts from newdecl so they don't get applied when we merge
+    the attributes.   */
+  if (TREE_CODE (newdecl) == FUNCTION_DECL)
+    remove_contract_attributes(newdecl);
 
   if (TREE_CODE (newdecl) == FUNCTION_DECL)
     {
@@ -3260,6 +3263,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	reregister_specialization (newdecl,
 				   new_template_info,
 				   olddecl);
+
     }
   else
     {
@@ -3340,7 +3344,8 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 
   /* NEWDECL contains the merged attribute lists.
      Update OLDDECL to be the same.  */
-  DECL_ATTRIBUTES (olddecl) = DECL_ATTRIBUTES (newdecl);
+
+   DECL_ATTRIBUTES (olddecl) = DECL_ATTRIBUTES (newdecl);
 
   /* If OLDDECL had its DECL_RTL instantiated, re-invoke make_decl_rtl
     so that encode_section_info has a chance to look at the new decl
@@ -3370,6 +3375,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 
   if (TREE_CODE (olddecl) == FUNCTION_DECL)
     {
+      set_contract_attributes(olddecl, contracts);
       tree clone;
       FOR_EACH_CLONE (clone, olddecl)
 	{
@@ -6017,6 +6023,21 @@ start_decl (const cp_declarator *declarator,
       return error_mark_node;
     }
 
+  if (flag_contracts_nonattr
+      && TREE_CODE (decl) == FUNCTION_DECL
+      && !processing_template_decl
+      && DECL_RESULT (decl)
+      && is_auto (TREE_TYPE (DECL_RESULT (decl))))
+    for (tree contract = DECL_CONTRACTS (decl); contract;
+	 contract = CONTRACT_CHAIN (contract))
+      if (POSTCONDITION_P (CONTRACT_STATEMENT (contract))
+	  && POSTCONDITION_IDENTIFIER (CONTRACT_STATEMENT (contract)))
+	{
+	  error_at (DECL_SOURCE_LOCATION (decl),
+		    "postconditions with deduced result name types must only"
+		    " appear on function definitions");
+	  return error_mark_node;
+	}
   /* Save the DECL_INITIAL value in case it gets clobbered to assist
      with attribute validation.  */
   initial = DECL_INITIAL (decl);
@@ -6176,7 +6197,7 @@ start_decl (const cp_declarator *declarator,
 	    permerror (declarator->id_loc,
 		       "declaration of %q#D outside of class is not definition",
 		       decl);
-	  else if (flag_contract_strict_declarations)
+	  else if (!flag_contracts_nonattr && flag_contract_strict_declarations)
 	    warning_at (declarator->id_loc, OPT_fcontract_strict_declarations_,
 			"declaration of %q#D outside of class is not definition",
 			decl);
@@ -14433,6 +14454,9 @@ grokdeclarator (const cp_declarator *declarator,
 	      }
 
 	    /* Actually apply the contract attributes to the declaration.  */
+	    if (flag_contracts_nonattr)
+	      returned_attrs = chainon (returned_attrs, declarator->u.function.contracts);
+	    /* Allow mixing std-attribute style and p2900 syntax.  */
 	    for (tree *p = &attrs; *p;)
 	      {
 		tree l = *p;
@@ -19237,9 +19261,6 @@ finish_function (bool inline_p)
   if (fndecl == NULL_TREE || fndecl == error_mark_node)
     return error_mark_node;
 
-  bool do_contracts = (DECL_HAS_CONTRACTS_P (fndecl)
-		       && !processing_template_decl);
-
   if (!DECL_OMP_DECLARE_REDUCTION_P (fndecl))
     finish_lambda_scope ();
 
@@ -19282,7 +19303,7 @@ finish_function (bool inline_p)
 			      current_eh_spec_block);
 
      /* If outlining succeeded, then add contracts handling if needed.  */
-     if (coroutine->cp_valid_coroutine () && do_contracts)
+     if (coroutine->cp_valid_coroutine ())
 	maybe_apply_function_contracts (fndecl);
     }
   else
@@ -19300,8 +19321,7 @@ finish_function (bool inline_p)
 			      (TREE_TYPE (current_function_decl)),
 			      current_eh_spec_block);
 
-     if (do_contracts)
-	maybe_apply_function_contracts (current_function_decl);
+      maybe_apply_function_contracts (current_function_decl);
 
     }
 
