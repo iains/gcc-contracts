@@ -1883,6 +1883,23 @@ Enum(on_off) String(off) Value(0)
 EnumValue
 Enum(on_off) String(on) Value(1)
 
+fcontracts-nonattr
+C++ Var(flag_contracts_nonattr) Init(0)
+Enable the non-attribute syntax for contracts.
+
+fcontracts-nonattr-noconst
+C++ Var(flag_contracts_nonattr_noconst) Init(0)
+Disable the const-ification of entities appearing in a contract condition.
+
+fcontracts-nonattr-mutable-keyword
+C++ Var(flag_contracts_nonattr_mutable_keyword) Init(0)
+Enable the mutable keyword for non-attribute syntax for contracts.
+
+fcontracts-nonattr-const-keyword
+C++ Var(flag_contracts_nonattr_const_keyword) Init(0)
+Enable the const keyword for non-attribute syntax for contracts.
+This also disables constification-by-default.
+
 fcontract-assumption-mode=
 C++ Joined RejectNegative
 -fcontract-assumption-mode=[on|off]	Enable or disable treating axiom level contracts as assumptions (default on).
@@ -1910,6 +1927,83 @@ C++ Joined RejectNegative
 fcontract-semantic=
 C++ Joined RejectNegative
 -fcontract-semantic=<level>:<semantic>	Specify the concrete semantics for level.
+
+Enum
+Name(p2900_semantic) Type(int)  UnknownError(unrecognized contract evaluation semantic %qs)
+
+EnumValue
+Enum(p2900_semantic) String(ignore) Value(1)
+
+EnumValue
+Enum(p2900_semantic) String(enforce) Value(3)
+
+EnumValue
+Enum(p2900_semantic) String(observe) Value(4)
+
+EnumValue
+Enum(p2900_semantic) String(quick_enforce) Value(5)
+
+EnumValue
+Enum(p2900_semantic) String(noexcept_enforce) Value(6)
+
+EnumValue
+Enum(p2900_semantic) String(noexcept_observe) Value(7)
+
+fcontract-evaluation-semantic=
+C++ Joined RejectNegative Enum(p2900_semantic) Var(flag_contract_evaluation_semantic) Init (3)
+-fcontract-evaluation-semantic=[ignore|observe|enforce|quick_enforce|noexcept_enforce|noexcept_observe]	Select the contract evaluation semantic (defaults to enforce).
+
+fcontract-checks-outlined
+C++ Var(flag_contract_checks_outlined) Init(1)
+-fcontract-checks-outlined	Build contract checks as an out-of-line function.
+
+fcontract-disable-optimized-checks
+C++ Var(flag_contract_disable_optimized_checks) Init(0)
+-fcontract-disable-optimized-checks	Disable optimisation of contract checks.
+
+fcontract-disable-check-epochs
+C++ Var(flag_contract_disable_check_epochs) Init(0)
+-fcontract-disable-epoch-checks	Disable insertion of epoch markers after each contract check.
+
+Enum
+Name(client_contract_check) Type(int)  UnknownError(unrecognized client contract check option %qs)
+
+EnumValue
+Enum(client_contract_check) String(none) Value(0)
+
+EnumValue
+Enum(client_contract_check) String(pre) Value(1)
+
+EnumValue
+Enum(client_contract_check) String(all) Value(2)
+
+fcontracts-nonattr-client-check=
+C++ Joined RejectNegative Enum(client_contract_check) Var(flag_contract_nonattr_client_check) Init (0)
+-fcontracts-nonattr-client-check=[none|pre|all] Select which contracts will be checked on the client side for non virtual functions
+
+fcontracts-nonattr-definition-check=
+C++ Joined RejectNegative Enum(on_off) Var(flag_contracts_nonattr_definition_check) Init(1)
+-fcontracts-nonattr-definition-check=[on|off]	Enable or disable contract checks on the definition side for all functions (default on).
+
+Enum
+Name(contract_inheritance) Type(int)  UnknownError(unrecognized contract inheritance mode option %qs)
+
+EnumValue
+Enum(contract_inheritance) String(none) Value(0)
+
+EnumValue
+Enum(contract_inheritance) String(P2900R13) Value(1)
+
+EnumValue
+Enum(contract_inheritance) String(P3653) Value(2)
+
+fcontracts-on-virtual-functions=
+C++ Joined RejectNegative Enum(contract_inheritance) Var(flag_contracts_on_virtual_functions) Init(0)
+-fcontracts-on-virtual-functions=[none|P2900R13|P3653] Select how contracts are inherited for virtual functions
+
+Wsuggest-explicit-contract
+C++ ObjC++ Var(suggest_explicit_contract) Warning
+Warn about functions with implicitly inherited contracts.
 
 fcoroutines
 C++ LTO Var(flag_coroutines)

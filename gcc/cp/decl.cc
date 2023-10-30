@@ -2276,6 +2276,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 		 declaration of the function or function template in the
 		 translation unit."  */
 	      check_no_redeclaration_friend_default_args (olddecl, newdecl);
+
 	    }
 	}
     }
@@ -2479,10 +2480,6 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 
       /* Make sure the contracts are equivalent.  */
       duplicate_contracts (newdecl, olddecl);
-
-      /* Remove contracts from old_result so they aren't appended to
-	 old_result by the merge function.  */
-      remove_contract_attributes (old_result);
 
       DECL_ATTRIBUTES (old_result)
 	= (*targetm.merge_decl_attributes) (old_result, new_result);
@@ -6017,6 +6014,21 @@ start_decl (const cp_declarator *declarator,
       return error_mark_node;
     }
 
+  if (flag_contracts_nonattr
+      && TREE_CODE (decl) == FUNCTION_DECL
+      && !processing_template_decl
+      && DECL_RESULT (decl)
+      && is_auto (TREE_TYPE (DECL_RESULT (decl))))
+    for (tree contract = DECL_CONTRACTS (decl); contract;
+	 contract = CONTRACT_CHAIN (contract))
+      if (POSTCONDITION_P (CONTRACT_STATEMENT (contract))
+	  && POSTCONDITION_IDENTIFIER (CONTRACT_STATEMENT (contract)))
+	{
+	  error_at (DECL_SOURCE_LOCATION (decl),
+		    "postconditions with deduced result name types must only"
+		    " appear on function definitions");
+	  return error_mark_node;
+	}
   /* Save the DECL_INITIAL value in case it gets clobbered to assist
      with attribute validation.  */
   initial = DECL_INITIAL (decl);
@@ -6176,7 +6188,7 @@ start_decl (const cp_declarator *declarator,
 	    permerror (declarator->id_loc,
 		       "declaration of %q#D outside of class is not definition",
 		       decl);
-	  else if (flag_contract_strict_declarations)
+	  else if (!flag_contracts_nonattr && flag_contract_strict_declarations)
 	    warning_at (declarator->id_loc, OPT_fcontract_strict_declarations_,
 			"declaration of %q#D outside of class is not definition",
 			decl);
@@ -14433,6 +14445,9 @@ grokdeclarator (const cp_declarator *declarator,
 	      }
 
 	    /* Actually apply the contract attributes to the declaration.  */
+	    if (flag_contracts_nonattr)
+	      returned_attrs = chainon (returned_attrs, declarator->u.function.contracts);
+	    /* Allow mixing std-attribute style and p2900 syntax.  */
 	    for (tree *p = &attrs; *p;)
 	      {
 		tree l = *p;
@@ -19237,9 +19252,6 @@ finish_function (bool inline_p)
   if (fndecl == NULL_TREE || fndecl == error_mark_node)
     return error_mark_node;
 
-  bool do_contracts = (DECL_HAS_CONTRACTS_P (fndecl)
-		       && !processing_template_decl);
-
   if (!DECL_OMP_DECLARE_REDUCTION_P (fndecl))
     finish_lambda_scope ();
 
@@ -19282,7 +19294,7 @@ finish_function (bool inline_p)
 			      current_eh_spec_block);
 
      /* If outlining succeeded, then add contracts handling if needed.  */
-     if (coroutine->cp_valid_coroutine () && do_contracts)
+     if (coroutine->cp_valid_coroutine ())
 	maybe_apply_function_contracts (fndecl);
     }
   else
@@ -19300,8 +19312,7 @@ finish_function (bool inline_p)
 			      (TREE_TYPE (current_function_decl)),
 			      current_eh_spec_block);
 
-     if (do_contracts)
-	maybe_apply_function_contracts (current_function_decl);
+      maybe_apply_function_contracts (current_function_decl);
 
     }
 
