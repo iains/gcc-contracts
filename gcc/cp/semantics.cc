@@ -46,6 +46,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "predict.h"
 #include "memmodel.h"
 #include "gimplify.h"
+#include "print-tree.h"
+#include "contracts.h"
 
 /* There routines provide a modular interface to perform many parsing
    operations.  They may therefore be used during actual parsing, or
@@ -4856,6 +4858,7 @@ finish_id_expression_1 (tree id_expression,
 						   | TYPE_QUAL_CONST));
 	  r = build1 (VIEW_CONVERT_EXPR, ctype, r);
 	}
+
       r = convert_from_reference (r);
       if (integral_constant_expression_p
 	  && !dependent_type_p (TREE_TYPE (decl))
@@ -4867,6 +4870,11 @@ finish_id_expression_1 (tree id_expression,
 		   "integral or enumeration type", decl, TREE_TYPE (decl));
 	  *non_integral_constant_expression_p = true;
 	}
+
+      if (flag_contracts_nonattr && should_constify_contract
+	  && processing_contract_condition)
+	r = constify_contract_access(r);
+
       return r;
     }
   else if (TREE_CODE (decl) == UNBOUND_CLASS_TEMPLATE)
@@ -4990,10 +4998,21 @@ finish_id_expression_1 (tree id_expression,
 	}
       else if (TREE_CODE (decl) == FIELD_DECL)
 	{
+	  if (flag_contracts_nonattr && processing_contract_condition
+	      && contract_class_ptr == current_class_ptr)
+	    {
+	      error ("%qD 'this' required when accessing a member within a "
+		  "constructor precondition or destructor postcondition "
+		  "contract check", decl);
+		      return error_mark_node;
+	    }
 	  /* Since SCOPE is NULL here, this is an unqualified name.
 	     Access checking has been performed during name lookup
 	     already.  Turn off checking to avoid duplicate errors.  */
 	  push_deferring_access_checks (dk_no_check);
+
+
+
 	  decl = finish_non_static_data_member (decl, NULL_TREE,
 						/*qualifying_scope=*/NULL_TREE);
 	  pop_deferring_access_checks ();
@@ -5013,6 +5032,14 @@ finish_id_expression_1 (tree id_expression,
 		      && !shared_member_p (decl))))
 	    {
 	      /* A set of member functions.  */
+	      if (flag_contracts_nonattr && processing_contract_condition
+		  && contract_class_ptr == current_class_ptr)
+		{
+		  error ("%qD 'this' required when accessing a member within a "
+		      "constructor precondition or destructor postcondition "
+		      "contract check", decl);
+		  return error_mark_node;
+		}
 	      decl = maybe_dummy_object (DECL_CONTEXT (first_fn), 0);
 	      return finish_class_member_access_expr (decl, id_expression,
 						      /*template_p=*/false,
@@ -5047,6 +5074,11 @@ finish_id_expression_1 (tree id_expression,
 	  decl = convert_from_reference (decl);
 	}
     }
+
+  check_param_in_postcondition (decl, location);
+  if (flag_contracts_nonattr && should_constify_contract
+	&& processing_contract_condition)
+    decl = constify_contract_access(decl);
 
   return cp_expr (decl, location);
 }
@@ -12839,6 +12871,12 @@ finish_decltype_type (tree expr, bool id_expression_or_member_access_p,
          overloaded functions, the program is ill-formed.  */
       if (identifier_p (expr))
         expr = lookup_name (expr);
+
+      /* If e is a constified expression inside a contract assertion,
+	 strip the const wrapper. Per P2900R14, "For a function f with the
+	 return type T , the result name is an lvalue of type const T , decltype(r)
+	 is T , and decltype((r)) is const T&."  */
+      expr = strip_contract_const_wrapper (expr);
 
       if (INDIRECT_REF_P (expr)
 	  || TREE_CODE (expr) == VIEW_CONVERT_EXPR)

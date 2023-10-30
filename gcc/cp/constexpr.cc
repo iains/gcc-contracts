@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "fold-const.h"
 #include "intl.h"
 #include "toplev.h"
+#include "contracts.h"
 
 static bool verify_constant (tree, bool, bool *, bool *);
 #define VERIFY_CONSTANT(X)						\
@@ -2349,6 +2350,10 @@ cxx_eval_builtin_function_call (const constexpr_ctx *ctx, tree t, tree fun,
 	/* These builtins shall be ignored during constant expression
 	   evaluation.  */
 	return void_node;
+      case BUILT_IN_OBSERVABLE:
+	if (ctx->manifestly_const_eval == mce_true)
+	  return void_node;
+	/* FALLTHROUGH */
       case BUILT_IN_UNREACHABLE:
       case BUILT_IN_TRAP:
 	if (!*non_constant_p && !ctx->quiet)
