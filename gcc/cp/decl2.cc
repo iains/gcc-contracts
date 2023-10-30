@@ -52,6 +52,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "omp-general.h"
 #include "tree-inline.h"
 #include "escaped_string.h"
+#include "contracts.h"
 
 /* Id for dumping the raw trees.  */
 int raw_dump_id;
@@ -2357,7 +2358,9 @@ comdat_linkage (tree decl)
   if (flag_weak)
     {
       make_decl_one_only (decl, cxx_comdat_group (decl));
-      if (HAVE_COMDAT_GROUP && flag_contracts && DECL_CONTRACTS (decl))
+      if (HAVE_COMDAT_GROUP
+	  && flag_contracts
+	  && (DECL_CONTRACT_ATTRS (decl) || GET_FN_CONTRACT_SPECIFIERS (decl)))
 	{
 	  symtab_node *n = symtab_node::get (decl);
 	  if (tree pre = DECL_PRE_FN (decl))
@@ -5583,6 +5586,12 @@ c_parse_final_cleanups (void)
 	   importer.  */
 	continue;
 
+      /* Emit wrappers where needed, and if that causes more to be added then
+	 make sure we account for possible additional instantiations.  */
+      if (flag_contracts_nonattr && flag_contracts)
+	if (emit_contract_wrapper_func (/*done*/false))
+	  reconsider = true;
+
       /* Write out virtual tables as required.  Writing out the
 	 virtual table for a template class may cause the
 	 instantiation of members of that class.  If we write out
@@ -5791,6 +5800,12 @@ c_parse_final_cleanups (void)
 	  && wrapup_global_declarations (pending_statics->address (),
 					 pending_statics->length ()))
 	reconsider = true;
+    }
+
+  if (flag_contracts_nonattr && flag_contracts)
+    {
+      emit_contract_wrapper_func (/*done*/true);
+      maybe_emit_violation_handler_wrappers ();
     }
 
   /* All templates have been instantiated.  */

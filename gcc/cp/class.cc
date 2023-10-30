@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "gimplify.h"
 #include "intl.h"
 #include "asan.h"
+#include "contracts.h"
 
 /* Id for dumping the class hierarchy.  */
 int class_dump_id;
@@ -3230,6 +3231,8 @@ check_for_override (tree decl, tree ctype)
 	 function.  */
       DECL_VINDEX (decl) = decl;
 
+      check_override_contracts (decl);
+
       if (warn_override
 	  && !DECL_OVERRIDE_P (decl)
 	  && !DECL_FINAL_P (decl)
@@ -3251,6 +3254,15 @@ check_for_override (tree decl, tree ctype)
 
       if (DECL_DESTRUCTOR_P (decl))
 	TYPE_HAS_NONTRIVIAL_DESTRUCTOR (ctype) = true;
+
+      if (DECL_HAS_CONTRACTS_P(decl)
+	  && flag_contracts_nonattr
+	  && flag_contracts_on_virtual_functions
+	      == CONTRACTS_ON_VIRTUALS_NONE)
+	{
+	  error_at (DECL_SOURCE_LOCATION(decl),
+		    "Contracts cannot be added to virtual functions.");
+	}
     }
   else if (DECL_FINAL_P (decl))
     error ("%q+#D marked %<final%>, but is not virtual", decl);
