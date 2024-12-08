@@ -131,7 +131,7 @@ struct G3
 template<typename S>
 struct G3<int, S>
 {
-  void f(int t, S s)  pre ( t > 1 )  pre ( s > 1 ) ;
+  void f(int t, S s) pre ( t > 1 ) pre ( s > 1 );
 };
 
 template<typename S>

@@ -14,10 +14,11 @@ struct Outer {
 
   friend void gfn2(int p, Outer *) pre (p > 0) { }
 
-  friend void gfn3(int n);
+  friend void gfn3 (int n);
 
   static int bob;
 };
+
 int Outer::bob{-1};
 
 void Outer::Inner::fn(int x) { }

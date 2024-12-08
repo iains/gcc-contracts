@@ -563,7 +563,7 @@ compute_concrete_semantic (tree contract)
 /* Return true if any contract in CONTRACT_ATTRs is not yet parsed.  */
 
 bool
-contract_any_deferred_p (tree contract_attr)
+contracts_any_deferred_p (tree contract_attr)
 {
   for (; contract_attr; contract_attr = CONTRACT_CHAIN (contract_attr))
     if (CONTRACT_CONDITION_DEFERRED_P (CONTRACT_STATEMENT (contract_attr)))
@@ -1303,7 +1303,7 @@ match_deferred_contracts (tree fndecl)
   if (!tp)
     return;
 
-  gcc_assert(!contract_any_deferred_p (DECL_CONTRACTS (fndecl)));
+  gcc_checking_assert(!contracts_any_deferred_p (DECL_CONTRACTS (fndecl)));
 
   processing_template_decl_sentinel ptds;
   processing_template_decl = uses_template_parms (fndecl);
@@ -3132,6 +3132,11 @@ maybe_apply_function_contracts (tree fndecl)
   /* We should not have reached here with nothing to do... */
   gcc_checking_assert (do_pre || do_post);
 
+  if (contracts_any_deferred_p (DECL_CONTRACTS (fndecl)))
+    {
+      //debug_tree (DECL_CONTRACTS (fndecl));
+    }
+
   /* If the function is noexcept, the user's written body will be wrapped in a
      MUST_NOT_THROW expression.  In that case we want to extract the body from
      that and build the replacement (including the pre and post-conditions as
@@ -3332,7 +3337,7 @@ struct contract_redecl
   tree pending_list;
 };
 
-static hash_map<tree_decl_hash, contract_redecl> redeclared_contracts;
+static hash_map<tree, contract_redecl> redeclared_contracts;
 
 /* This is called from push decl, and is used to determine if two sets of
     contract attributes match.  */
@@ -3406,6 +3411,9 @@ p2900_check_redecl_contract (tree newdecl, tree olddecl)
       /* Note that a friend declaration has deferred contracts, but the
 	 declaration of the same function outside the class definition
 	 doesn't.  */
+      /* Stash the parameters and unparsed contracts to process them later.  */
+      tree t = build_tree_list (DECL_ARGUMENTS (newdecl), new_contracts);
+      rd.pending_list = chainon (rd.pending_list, t);
     }
   else
     {
@@ -3523,6 +3531,80 @@ cxx2a_check_redecl_contract (tree newdecl, tree olddecl)
 	    olddecl, copy_and_remap_contracts (olddecl, newdecl, cmk_all));
 
     }
+}
+
+/* Return the first set of deferred-parsed contracts associated with DECL or
+   NULL_TREE if there are none or DECL is not registered.  */
+
+tree
+contracts_deferred_for_decl (tree decl)
+{
+  tree pending = NULL_TREE;
+  contract_redecl *rd = redeclared_contracts.get (decl);
+  if (rd && rd->pending_list)
+    {
+      pending = rd->pending_list;
+      rd->pending_list = TREE_CHAIN (pending);
+    }
+  return pending;
+}
+
+/* If we have now parsed contracts for the original function decl
+   In the case that we are parsing a member declaration; this will be a new
+   entry - we need to record it to deal with later definition (or
+   re-declaration out of the class def).  In the case of friend decls this
+   would be updating an existing entry.  */
+
+void
+contracts_update_decl (tree decl)
+{
+  bool existed = false;
+  contract_redecl& rd = redeclared_contracts.get_or_insert (decl, &existed);
+  /* Avoid overwriting the first set of information - since the merging of
+     decls along the way updates locations etc.  */
+  if (!existed)
+    {
+      tree updated = extract_contract_attributes (decl);
+      rd.original_contracts = updated;
+      location_t loc = DECL_SOURCE_LOCATION (decl);
+      location_t cont_end = loc;
+      if (updated)
+	cont_end = get_contract_end_loc (updated);
+      rd.note_loc = make_location (loc, loc, cont_end);
+      DECL_ATTRIBUTES (decl)
+	= attr_chainon (DECL_ATTRIBUTES (decl), updated);
+    }
+}
+
+void
+contracts_diagnose_re_decl (tree newdecl, tree olddecl)
+{
+  bool existed = false;
+  contract_redecl& rd = redeclared_contracts.get_or_insert (olddecl, &existed);
+  gcc_checking_assert (existed);
+  tree updated = extract_contract_attributes (newdecl);
+  location_t loc = DECL_SOURCE_LOCATION (newdecl);
+  location_t cont_end = loc;
+  if (updated)
+    get_contract_end_loc (updated);
+  cont_end = make_location (loc, loc, cont_end);
+  /* We have two sets - they should match or we issue a diagnostic.  */
+  match_contract_conditions (rd.note_loc, rd.original_contracts,
+			     cont_end, updated, cmc_declaration);
+}
+
+extern void debug_tree (tree);
+static bool
+print_hash_entry (tree_node* const& key, const contract_redecl& v, void *)
+{
+  debug_tree (key);
+  return true;
+}
+
+void
+dump_redecl_hash ()
+{
+  redeclared_contracts.traverse <void *, print_hash_entry> (NULL);
 }
 
 /* A subroutine of duplicate_decls. Diagnose issues in the redeclaration of

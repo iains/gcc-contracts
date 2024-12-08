@@ -7265,6 +7265,7 @@ extern tree maybe_push_decl			(tree);
 extern tree current_decl_namespace		(void);
 
 /* decl.cc */
+typedef struct cp_parser *parser_ptr;
 extern tree poplevel				(int, int, int);
 extern void cxx_init_decl_processing		(void);
 enum cp_tree_node_structure_enum cp_tree_node_structure
@@ -7306,7 +7307,7 @@ extern void warn_misplaced_attr_for_class_type  (location_t location,
 extern tree check_tag_decl			(cp_decl_specifier_seq *, bool);
 extern tree shadow_tag				(cp_decl_specifier_seq *);
 extern tree groktypename			(cp_decl_specifier_seq *, const cp_declarator *, bool);
-extern tree start_decl				(const cp_declarator *, cp_decl_specifier_seq *, int, tree, tree, tree *);
+extern tree start_decl				(const cp_declarator *, cp_decl_specifier_seq *, int, tree, tree, tree *, parser_ptr);
 extern void start_decl_1			(tree, bool);
 extern bool check_array_initializer		(tree, tree, tree);
 extern void omp_declare_variant_finalize	(tree, tree);
@@ -7339,7 +7340,7 @@ extern tree build_enumerator			(tree, tree, tree, tree, location_t);
 extern tree lookup_enumerator			(tree, tree);
 extern bool start_preparsed_function		(tree, tree, int);
 extern bool start_function			(cp_decl_specifier_seq *,
-						 const cp_declarator *, tree);
+						 const cp_declarator *, tree, parser_ptr);
 extern tree maybe_prepare_return_this		(tree);
 extern void maybe_return_this			(void);
 extern tree begin_function_body			(void);
@@ -7795,6 +7796,7 @@ extern tree clone_attrs				(tree);
 extern bool maybe_clone_body			(tree);
 
 /* In parser.cc */
+void cp_parser_late_contract_condition		(parser_ptr, tree, tree);
 extern tree cp_convert_range_for (tree, tree, tree, cp_decomp *, bool,
 				  tree, bool);
 extern void cp_convert_omp_range_for (tree &, tree &, tree &,

@@ -23,7 +23,7 @@ struct D : B {
 // non attribute contracts come after override.
 struct E : D {
   void f() post(true) override;  // { dg-error "expected" }
-  // { dg-error "override" "" { target *-*-* } .-1 }
+  // { dg-error "override. does not name a type" "" { target *-*-* } .-1 }
 };
 
 

@@ -67,8 +67,8 @@ struct T1
   void vfun(int m, double n);
 };
 
-void T1::vfun(int m, double n)
-   pre ( x < 0 ) // { dg-error "was not declared in this" }
+void T1::vfun(int m, double n) // { dg-error "declaration adds contracts" }
+   pre ( x < 0 )
 {
 }
 

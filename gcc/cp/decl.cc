@@ -3062,6 +3062,7 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	     info and other bits, but if not, we won't.  */
 	  DECL_ARGUMENTS (olddecl) = DECL_ARGUMENTS (newdecl);
 	  DECL_RESULT (olddecl) = DECL_RESULT (newdecl);
+
 	}
       /* If redeclaring a builtin function, it stays built in
 	 if newdecl is a gnu_inline definition, or if newdecl is just
@@ -5989,7 +5990,7 @@ start_decl (const cp_declarator *declarator,
 	    int initialized,
 	    tree attributes,
 	    tree prefix_attributes,
-	    tree *pushed_scope_p)
+	    tree *pushed_scope_p, parser_ptr parser)
 {
   tree decl;
   tree context;
@@ -6014,6 +6015,59 @@ start_decl (const cp_declarator *declarator,
   context = CP_DECL_CONTEXT (decl);
   if (context != global_namespace)
     *pushed_scope_p = push_scope (context);
+
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && declarator->kind == cdk_function
+      && declarator->u.function.contracts)
+    {
+      tree old_decl = decl;
+      tree current = DECL_CONTRACTS (decl);
+      //gcc_checking_assert (current);
+      bool needs_update = false;
+      if (current && contracts_any_deferred_p  (current))
+	needs_update = true;
+      else if (tree deferred = contracts_deferred_for_decl (old_decl))
+	{
+	  decl = copy_decl (old_decl);
+	  remove_contract_attributes (decl);
+	  DECL_INITIAL (decl) = NULL_TREE;
+	  DECL_ARGUMENTS (decl) = TREE_PURPOSE (deferred);
+	  DECL_ATTRIBUTES (decl) = attr_chainon (DECL_ATTRIBUTES (decl),
+						 TREE_VALUE (deferred));
+	}
+      tree old_fn = current_function_decl;
+      function *old_cfun = cfun;
+      current_function_decl = decl;
+      set_cfun (NULL);
+      begin_scope (sk_function_parms, decl);
+      if (DECL_ARGUMENTS (decl) && !VOID_TYPE_P (DECL_ARGUMENTS (decl)))
+	{
+	  tree current_function_parms = DECL_ARGUMENTS (decl);
+	  tree nonparms = NULL_TREE;
+	  tree specparms = current_function_parms;
+	  current_binding_level->names = NULL;
+	  do_push_parm_decls (decl, specparms, &nonparms);
+	  current_binding_level->names
+	    = chainon (nonparms, DECL_ARGUMENTS (decl));
+	}
+
+      for (tree a = DECL_CONTRACTS (decl); a; a = CONTRACT_CHAIN (a))
+	if (CONTRACT_CONDITION_DEFERRED_P (CONTRACT_STATEMENT (a)))
+	  cp_parser_late_contract_condition (parser, decl, a);
+      rebuild_postconditions (decl);
+
+      pop_bindings_and_leave_scope ();
+      set_cfun (old_cfun);
+      current_function_decl = old_fn;
+      if (flag_contracts_nonattr)
+	{
+	  if (needs_update)
+	    ;//contracts_update_decl (old_decl);
+	  else
+	    contracts_diagnose_re_decl (decl, old_decl);
+	}
+      decl = old_decl;
+     }
 
   if (initialized && TREE_CODE (decl) == TYPE_DECL)
     {
@@ -19117,7 +19171,7 @@ start_preparsed_function (tree decl1, tree attrs, int flags)
 bool
 start_function (cp_decl_specifier_seq *declspecs,
 		const cp_declarator *declarator,
-		tree attrs)
+		tree attrs, parser_ptr parser)
 {
   tree decl1;
 
@@ -19131,6 +19185,74 @@ start_function (cp_decl_specifier_seq *declspecs,
        (and issued a diagnostic) if the user got it wrong.  */
     gcc_assert (same_type_p (TREE_TYPE (TREE_TYPE (decl1)),
 			     integer_type_node));
+
+  /* Decide if we now need to parse deferred contract conditions.  */
+  if (declarator->kind == cdk_function
+      && declarator->u.function.contracts)
+    {
+      tree old_decl = decl1;
+      tree current = DECL_CONTRACTS (decl1);
+      //gcc_checking_assert (current);
+      bool needs_update = false;
+      if (current && contracts_any_deferred_p  (current))
+	needs_update = true;
+      else if (tree deferred = contracts_deferred_for_decl (old_decl))
+	{
+	  decl1 = copy_decl (old_decl);
+	  remove_contract_attributes (decl1);
+	  DECL_INITIAL (decl1) = NULL_TREE;
+	  DECL_ARGUMENTS (decl1) = TREE_PURPOSE (deferred);
+	  DECL_ATTRIBUTES (decl1) = attr_chainon (DECL_ATTRIBUTES (decl1),
+						 TREE_VALUE (deferred));
+	}
+      tree old_fn = current_function_decl;
+      function *old_cfun = cfun;
+      current_function_decl = decl1;
+      set_cfun (NULL);
+      tree pushed_scope = NULL_TREE;
+      /* Pick up the context for what we're going to parse... */
+      tree context = CP_DECL_CONTEXT (decl1);
+      /* ... and the params list that corresponds.  */
+      tree current_function_parms = DECL_ARGUMENTS (decl1);
+      /* Do we need to set class context?  */
+      if (TREE_CODE (TREE_TYPE (decl1)) == METHOD_TYPE
+	  && context != global_namespace
+	  && declspecs->storage_class != sc_static)
+	{
+	  pushed_scope = push_scope (context);
+	  current_class_ref = cp_build_fold_indirect_ref (current_function_parms);
+	  current_class_ptr = current_function_parms;
+	}
+      begin_scope (sk_function_parms, decl1);
+      if (current_function_parms)
+	{
+	  tree nonparms = NULL_TREE;
+	  tree specparms = current_function_parms;
+	  current_binding_level->names = NULL;
+	  do_push_parm_decls (decl1, specparms, &nonparms);
+	  current_binding_level->names
+	    = chainon (nonparms, DECL_ARGUMENTS (decl1));
+	}
+
+      for (tree a = DECL_CONTRACTS (decl1); a; a = CONTRACT_CHAIN (a))
+	if (CONTRACT_CONDITION_DEFERRED_P (CONTRACT_STATEMENT (a)))
+	  cp_parser_late_contract_condition (parser, decl1, a);
+      rebuild_postconditions (decl1);
+
+      pop_bindings_and_leave_scope ();
+      if (pushed_scope)
+	pop_scope (pushed_scope);
+      set_cfun (old_cfun);
+      current_function_decl = old_fn;
+      if (flag_contracts_nonattr)
+	{
+	  if (needs_update)
+	    contracts_update_decl (old_decl);
+	  else
+	    contracts_diagnose_re_decl (decl1, old_decl);
+	}
+      decl1 = old_decl;
+    }
 
   return start_preparsed_function (decl1, attrs, /*flags=*/SF_DEFAULT);
 }
