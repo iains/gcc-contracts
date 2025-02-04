@@ -6855,6 +6855,7 @@ extern cp_parameter_declarator *no_parameters;
 extern int class_dump_id;
 extern int module_dump_id;
 extern int raw_dump_id;
+extern int orig_dump_id;
 extern int coro_dump_id;
 
 /* Whether the current context is manifestly constant-evaluated.

@@ -52,9 +52,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "omp-general.h"
 #include "tree-inline.h"
 #include "escaped_string.h"
+#include "cxx-pretty-print.h"
 
 /* Id for dumping the raw trees.  */
 int raw_dump_id;
+int orig_dump_id;
 
 extern cpp_reader *parse_in;
 
@@ -5425,6 +5427,39 @@ dump_tu (void)
     {
       dump_node (global_namespace, flags & ~TDF_SLIM, stream);
       dump_end (raw_dump_id, stream);
+    }
+
+  dump_flags_t o_flags;
+  if (FILE *o_stream = dump_begin (orig_dump_id, &o_flags))
+    {
+      cxx_pretty_printer pp;
+      pp.set_output_stream (o_stream);
+      pp.flags = o_flags;
+
+      pp_string (&pp, "Variables defined:\n");
+      varpool_node *v_node;
+      FOR_EACH_DEFINED_VARIABLE (v_node)
+	{
+	  tree d = v_node->decl;
+	  pp.declaration (d);
+	  pp_newline_and_flush (&pp);
+	}
+	  
+      pp_string (&pp, "\nGlobal namespace:\n");
+      pp.p_namespace (global_namespace);
+
+      pp_newline_and_flush (&pp);
+      pp_string (&pp, "\nOther functions defined:\n");
+      tree tu_decl = DECL_CONTEXT (global_namespace); 
+      cgraph_node *f_node;
+      FOR_EACH_DEFINED_FUNCTION (f_node)
+	{
+	  tree d = f_node->decl;
+	  if (DECL_CONTEXT (d) && DECL_CONTEXT (d) == tu_decl)
+	    continue;
+	  pp.declaration (d);
+	  pp_newline_and_flush (&pp);
+	}
     }
 }
 
