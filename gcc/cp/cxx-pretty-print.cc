@@ -559,6 +559,22 @@ cxx_pretty_printer::primary_expression (tree t)
     }
 }
 
+static tree
+resolve_virtual_fun_from_obj_type_ref (tree ref)
+{
+  tree obj_type = TREE_TYPE (OBJ_TYPE_REF_TOKEN (ref));
+  HOST_WIDE_INT index = tree_to_uhwi (OBJ_TYPE_REF_TOKEN (ref));
+  tree fun = BINFO_VIRTUALS (TYPE_BINFO (TREE_TYPE (obj_type)));
+  while (index)
+    {
+      fun = TREE_CHAIN (fun);
+      index -= (TARGET_VTABLE_USES_DESCRIPTORS
+		? TARGET_VTABLE_USES_DESCRIPTORS : 1);
+    }
+
+  return BV_FN (fun);
+}
+
 /* postfix-expression:
      primary-expression
      postfix-expression [ expression ]
@@ -643,6 +659,17 @@ cxx_pretty_printer::postfix_expression (tree t)
 	    enclosing_scope = strip_pointer_operator (TREE_TYPE (object));
 	  }
 	postfix_expression (fun);
+	if (TREE_CODE (fun) == OBJ_TYPE_REF)
+	  fun = resolve_virtual_fun_from_obj_type_ref (fun);
+//  if (FUNC_OR_METHOD_TYPE_P (fun))
+    {
+  if (DECL_CONTRACT_WRAPPER (fun))
+    pp_string (this, ".contract_wrapper");
+  if (CONTRACT_HELPER (fun) == ldf_contract_pre)
+    pp_string (this, ".pre");
+  else if (CONTRACT_HELPER (fun) == ldf_contract_post)
+    pp_string (this, ".post");
+    }
 	  }
 	else
 	  {
@@ -2068,6 +2095,12 @@ cxx_pretty_printer::direct_declarator (tree t)
     case FUNCTION_DECL:
       pp_cxx_space_for_pointer_operator (this, TREE_TYPE (TREE_TYPE (t)));
       expression (t);
+  if (DECL_CONTRACT_WRAPPER (t))
+    pp_string (this, ".contract_wrapper");
+  if (CONTRACT_HELPER (t) == ldf_contract_pre)
+    pp_string (this, ".pre");
+  else if (CONTRACT_HELPER (t) == ldf_contract_post)
+    pp_string (this, ".post");
       pp_cxx_whitespace (this);
       pp_cxx_parameter_declaration_clause (this, t);
 
