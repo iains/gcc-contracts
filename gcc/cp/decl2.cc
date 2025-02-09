@@ -5455,7 +5455,11 @@ dump_tu (void)
       FOR_EACH_DEFINED_FUNCTION (f_node)
 	{
 	  tree d = f_node->decl;
-	  if (DECL_CONTEXT (d) && DECL_CONTEXT (d) == tu_decl)
+	  if (DECL_CONTEXT (d)
+	      && DECL_CONTEXT (d) == tu_decl
+	      && !DECL_CONTRACT_WRAPPER (d)
+	      && CONTRACT_HELPER (d) != ldf_contract_pre
+	      && CONTRACT_HELPER (d) != ldf_contract_post)
 	    continue;
 	  pp.declaration (d);
 	  pp_newline_and_flush (&pp);
