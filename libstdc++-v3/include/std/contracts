@@ -1,6 +1,6 @@
 // Contracts support header for -*- C++ -*-
 
-// Copyright (C) 2019-2024 Free Software Foundation, Inc.
+// Copyright (C) 2019-2025 Free Software Foundation, Inc.
 //
 // This file is part of GCC.
 //
@@ -104,30 +104,109 @@ namespace contracts
     unspecified = 0,
     predicate_false = 1,
     evaluation_exception = 2,
-    manual = 3
+
     /* to be extended with implementation−defined values and by future extensions
 	 Implementation−defined values should have a minimum value of 1000. */
   };
 
-  using __vendor_ext = void;
-
-  class contract_violation {
+  class cv_object_min {
+  protected:
     uint16_t _M_version;
     assertion_kind _M_assertion_kind;
     evaluation_semantic _M_evaluation_semantic;
     detection_mode _M_detection_mode;
-    const char* _M_comment;
-    std::source_location _M_source_location;
-    __vendor_ext* _M_ext;
 
-    contract_violation(evaluation_semantic __semantic,
+  public:
+    assertion_kind kind() const noexcept { return _M_assertion_kind; }
+    evaluation_semantic semantic() const noexcept { return _M_evaluation_semantic; }
+    detection_mode mode() const noexcept { return _M_detection_mode; }
+    bool is_terminating () const noexcept {
+      return _M_evaluation_semantic == contracts::evaluation_semantic::enforce
+	    || _M_evaluation_semantic == contracts::evaluation_semantic::quick_enforce;
+    }
+    std::exception_ptr evaluation_exception () const noexcept {
+      if (_M_detection_mode == contracts::detection_mode::evaluation_exception)
+	return std::current_exception ();
+      return nullptr;
+    }
+  protected:
+    constexpr cv_object_min (assertion_kind a, evaluation_semantic e,
+			     detection_mode d)
+      : _M_version (0), _M_assertion_kind(a),
+        _M_evaluation_semantic(e),
+        _M_detection_mode(d) {}
+    constexpr cv_object_min (uint16_t v, assertion_kind a,
+			     evaluation_semantic e, detection_mode d)
+      : _M_version (v), _M_assertion_kind(a),
+        _M_evaluation_semantic(e),
+        _M_detection_mode(d) {}
+  };
+
+  class cv_with_comment : public cv_object_min {
+  protected:
+    const char* _M_comment;
+  public:
+    const char* comment() const noexcept { return _M_comment; }
+  protected:
+    constexpr cv_with_comment (assertion_kind a,
+			       evaluation_semantic e,
+			       detection_mode d, const char *c)
+      : cv_object_min{1, a, e, d}, _M_comment(c) {}
+    constexpr cv_with_comment (uint16_t v, assertion_kind a,
+			       evaluation_semantic e,
+			       detection_mode d, const char *c)
+      : cv_object_min{v, a, e, d}, _M_comment(c) {}
+  };
+
+  class cv_with_location : public cv_with_comment {
+  protected:
+    std::source_location _M_source_location;
+  public:
+    std::source_location location() const noexcept { return _M_source_location; }
+  protected:
+    constexpr cv_with_location (assertion_kind a,
+				evaluation_semantic e,
+				detection_mode d, const char *c,
+				const std::source_location &__location)
+      : cv_with_comment{2, a, e, d, c}, _M_source_location(__location) {}
+    constexpr cv_with_location (uint16_t v, assertion_kind a,
+				evaluation_semantic e,
+				detection_mode d, const char *c,
+				const std::source_location &__location)
+      : cv_with_comment{ v, a, e, d, c }, _M_source_location(__location) {}
+  };
+
+  using __vendor_ext = void;
+  class contract_violation : public cv_with_location {
+  protected:
+    __vendor_ext* _M_ext;
+  public:
+    // cannot be copied or moved
+    contract_violation(const contract_violation&) = delete;
+
+    // cannot be assigned to
+    contract_violation& operator=(const contract_violation&) = delete;
+  protected:
+    constexpr contract_violation (assertion_kind a,
+				  evaluation_semantic e, detection_mode d,
+				  const char *c,
+				  const std::source_location &__location,
+				  __vendor_ext* x)
+     : cv_with_location{3, a, e, d, c, __location}, _M_ext(x) {}
+    constexpr contract_violation (uint16_t v, assertion_kind a,
+				  evaluation_semantic e, detection_mode d,
+				  const char *c,
+				  const std::source_location &__location,
+				  __vendor_ext* x)
+     : cv_with_location{v, a, e, d, c, __location}, _M_ext(x) {}
+
+    // For D3290R3
+    constexpr contract_violation (evaluation_semantic __semantic,
 		       const std::source_location &__location,
 		       const char* __comment)
-      : _M_version(0), _M_assertion_kind(assertion_kind::manual),
-        _M_evaluation_semantic(__semantic),
-        _M_detection_mode(detection_mode::unspecified),
-        _M_comment(__comment), _M_source_location(__location),
-        _M_ext(nullptr) { }
+      : cv_with_location {4, assertion_kind::manual,__semantic,
+			  detection_mode::unspecified,__comment,
+			  __location}, _M_ext(nullptr) { }
 
     friend void handle_enforced_contract_violation(
 	const char*,
@@ -151,31 +230,9 @@ namespace contracts
 	const char*,
 	const std::source_location &) noexcept;
 
-  public:
-    // cannot be copied or moved
-    contract_violation(const contract_violation&) = delete;
-
-    // cannot be assigned to
-    contract_violation& operator=(const contract_violation&) = delete;
-
-    const char* comment() const noexcept { return _M_comment; }
-    detection_mode mode() const noexcept { return _M_detection_mode; }
-    std::exception_ptr evaluation_exception () const noexcept {
-      if (_M_detection_mode == std::contracts::detection_mode::evaluation_exception)
-	return std::current_exception ();
-      return nullptr;
-    }
-    bool is_terminating () const noexcept {
-      return _M_evaluation_semantic == std::contracts::evaluation_semantic::enforce
-	    || _M_evaluation_semantic == std::contracts::evaluation_semantic::quick_enforce;
-    }
-    assertion_kind kind() const noexcept { return _M_assertion_kind; }
-    std::source_location location() const noexcept { return _M_source_location; }
-    evaluation_semantic semantic() const noexcept { return _M_evaluation_semantic; }
   };
 
   void invoke_default_contract_violation_handler(const contract_violation&) noexcept;
-
 } // namespace contracts
 
 _GLIBCXX_END_NAMESPACE_VERSION
