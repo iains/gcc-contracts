@@ -300,9 +300,17 @@ enum contract_match_kind
 #define CONTRACT_LEVEL(NODE)		\
   (TREE_VALUE (CONTRACT_MODE (NODE)))
 
+/* P2900 meanings.  */
+/* evaluation_semantic */
+#define CONTRACT_EVALUATION_SEMANTIC(NODE) \
+  (TREE_OPERAND (CONTRACT_CHECK (NODE), 0))
+
+#define CONTRACT_ASSERTION_KIND(NODE) \
+  (TREE_OPERAND (CONTRACT_CHECK (NODE), 1))
+
 /* The parsed condition of the contract.  */
 #define CONTRACT_CONDITION(NODE) \
-  (TREE_OPERAND (CONTRACT_CHECK (NODE), 1))
+  (TREE_OPERAND (CONTRACT_CHECK (NODE), 2))
 
 /* True iff the condition of the contract NODE is not yet parsed.  */
 #define CONTRACT_CONDITION_DEFERRED_P(NODE) \
@@ -310,12 +318,16 @@ enum contract_match_kind
 
 /* The raw comment of the contract.  */
 #define CONTRACT_COMMENT(NODE) \
-  (TREE_OPERAND (CONTRACT_CHECK (NODE), 2))
+  (TREE_OPERAND (CONTRACT_CHECK (NODE), 3))
+
+/* A std::source_location, if provided.  */
+#define CONTRACT_STD_SOURCE_LOC(NODE) \
+  (TREE_OPERAND (CONTRACT_CHECK (NODE), 4))
 
 /* The VAR_DECL of a postcondition result. For deferred contracts, this
    is an IDENTIFIER.  */
 #define POSTCONDITION_IDENTIFIER(NODE) \
-  (TREE_OPERAND (POSTCONDITION_STMT_CHECK (NODE), 3))
+  (TREE_OPERAND (POSTCONDITION_STMT_CHECK (NODE), 5))
 
 /* For a FUNCTION_DECL of a guarded function, this holds the function decl
    where pre contract checks are emitted.  */

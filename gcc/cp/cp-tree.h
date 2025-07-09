@@ -9116,6 +9116,9 @@ extern void set_contract_attributes 		(tree, tree);
 extern void maybe_emit_violation_handler_wrappers (void);
 extern tree finish_contract_data		(location_t, tree, tree,
 						 tsubst_flags_t);
+extern tree finish_builtin_contract_violation_with (location_t,
+						    vec<tree, va_gc> *,
+						    tsubst_flags_t);
 
 /* Return the first contract in ATTRS, or NULL_TREE if there are none.  */
 

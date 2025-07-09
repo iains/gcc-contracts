@@ -44,16 +44,18 @@
 
 #include <bits/c++config.h>
 #if defined NDEBUG || ! defined ASSERT_USES_CONTRACTS
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic" // include_next
-#include_next <assert.h>
-#pragma GCC diagnostic pop
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wpedantic" // include_next
+# include_next <assert.h>
+# pragma GCC diagnostic pop
 #else // ASSERT_USES_CONTRACTS
-#include <contracts>
-#undef assert
-#define assert(...)                                                     \
-     (void)((__VA_ARGS__)                                               \
-         ? (void)(true ? true : bool(__VA_ARGS__))                      \
-         : std::contracts::__handle_assert_contract_violation (#__VA_ARGS__))
-
+# include <contracts>
+# undef assert
+# define assert(...)                                                   \
+    (void)((__VA_ARGS__)                                               \
+	   ? (void)(true ? true : bool(__VA_ARGS__))                   \
+	   : __builtin_contract_violation_with                         \
+	      (#__VA_ARGS__, std::source_location::current(),          \
+	       std::contracts::evaluation_semantic::enforce,           \
+	       std::contracts::assertion_kind::cassert))
 #endif

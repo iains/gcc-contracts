@@ -778,12 +778,16 @@ grok_contract (tree attribute, tree mode, tree result, cp_expr condition,
      the contract is deferred, result an plain identifier, not a result
      variable.  */
   tree contract;
-  tree type = void_type_node;
   if (code != POSTCONDITION_STMT)
-    contract = build3_loc (loc, code, type, mode, NULL_TREE, NULL_TREE);
+    contract = build5_loc (loc, code, void_type_node, mode,
+			   NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE);
   else
-    contract = build4_loc (loc, code, type, mode, NULL_TREE, NULL_TREE,
-			   result);
+    {
+      contract = build_nt (code, mode, NULL_TREE, NULL_TREE,
+			   NULL_TREE, NULL_TREE, result);
+      TREE_TYPE (contract) = void_type_node;
+      SET_EXPR_LOCATION (contract, loc);
+    }
 
   /* Determine the evaluation semantic:
      First, apply the c++2a rules
@@ -2152,6 +2156,14 @@ init_builtin_contract_violation_type ()
   return builtin_contract_violation_type;
 }
 
+static tree
+get_builtin_contract_violation_type ()
+{
+  if (builtin_contract_violation_type)
+    return builtin_contract_violation_type;
+  return init_builtin_contract_violation_type ();
+}
+
 /* Get name of contract_level of the specified contract. Used when building
  C++20 contract_violation object.  */
 
@@ -2210,7 +2222,7 @@ build_contract_violation_cxx2a (tree contract)
      NULL_TREE, build_int_cst (uint_least32_type_node, loc.line),
      NULL_TREE, build_int_cst (signed_char_type_node, cmode));
 
-  ctor = finish_compound_literal (builtin_contract_violation_type,
+  ctor = finish_compound_literal (get_builtin_contract_violation_type (),
 				  ctor, tf_none, fcl_c99);
   protected_set_expr_location (ctor, EXPR_LOCATION (contract));
   return ctor;
@@ -2222,6 +2234,16 @@ build_contract_violation_cxx2a (tree contract)
 static int
 get_contract_assertion_kind(tree contract)
 {
+  gcc_checking_assert (flag_contracts_nonattr);
+  if (CONTRACT_ASSERTION_KIND (contract))
+    {
+      tree s = CONTRACT_ASSERTION_KIND (contract);
+      tree i = (TREE_CODE (s) == INTEGER_CST) ? s
+					      : DECL_INITIAL (STRIP_NOPS (s));
+      gcc_checking_assert (!type_dependent_expression_p (s) && i);
+      return (uint16_t) tree_to_uhwi (i);
+    }
+
   switch (TREE_CODE (contract))
   {
     case ASSERTION_STMT:	return CAK_ASSERT;
@@ -2239,14 +2261,17 @@ get_contract_assertion_kind(tree contract)
 static uint16_t
 get_evaluation_semantic (tree contract)
 {
-  contract_semantic semantic = get_contract_semantic (contract);
-
-  if (!flag_contracts_nonattr)
+  gcc_checking_assert (flag_contracts_nonattr);
+  if (CONTRACT_EVALUATION_SEMANTIC (contract))
     {
-      if (checked_contract_p (semantic))
-	return CES_ENFORCE;
-      return CES_OBSERVE;
+      tree s = CONTRACT_EVALUATION_SEMANTIC (contract);
+      tree i = (TREE_CODE (s) == INTEGER_CST) ? s
+					      : DECL_INITIAL (STRIP_NOPS (s));
+      gcc_checking_assert (!type_dependent_expression_p (s) && i);
+      return (uint16_t) tree_to_uhwi (i);
     }
+
+  contract_semantic semantic = get_contract_semantic (contract);
 
   /* Used when building P2900R10 contract_violation object. Note that we do not
      build such objects unless we are going to use them - so that we should not
@@ -2277,46 +2302,121 @@ emit_builtin_observable ()
   releasing_vec vec;
   fn = finish_call_expr (fn, &vec, false, false, tf_warning_or_error);
   finish_expr_stmt (fn);
-
 }
 
 /* Build a p2900 contract_violation layout compatible object. */
 
-static tree
-build_contract_violation_p2900 (tree contract, bool is_const)
-{
-  uint16_t version = 1;
-  uint16_t assertion_kind = get_contract_assertion_kind (contract);
-  uint16_t evaluation_semantic = get_evaluation_semantic (contract);
+/* Constructor - possibly not constant. */
 
-  /* we hardcode CDM_PREDICATE_FALSE because that's all we support for now */
+static tree
+build_contract_violation_p2900_ctor (tree contract)
+{
+  bool can_be_const = true;
+  uint16_t version = 1;
+
+  /* Default CDM_PREDICATE_FALSE. */
   uint16_t detection_mode = CDM_PREDICATE_FALSE;
 
+  tree assertion_kind = CONTRACT_ASSERTION_KIND (contract);
+  if (!assertion_kind || really_constant_p (assertion_kind))
+    {
+      uint16_t kind = get_contract_assertion_kind (contract);
+      assertion_kind = build_int_cst (uint16_type_node, kind);
+      // D3290R3 makes detection mode unspecified.
+      if (kind == CAK_MANUAL || kind == CAK_CASSERT)
+        detection_mode = CDM_UNSPECIFIED;
+    }
+  else
+    can_be_const = false;
+
+  tree eval_semantic = CONTRACT_EVALUATION_SEMANTIC (contract);
+  if (!eval_semantic || really_constant_p (eval_semantic))
+    {
+      uint16_t semantic = get_evaluation_semantic (contract);
+      eval_semantic = build_int_cst (uint16_type_node, semantic);
+    }
+  else
+    can_be_const = false;
+
+  tree comment = CONTRACT_COMMENT (contract);
+  if (comment && !really_constant_p (comment))
+    can_be_const = false;
+
+  tree std_source_loc = CONTRACT_STD_SOURCE_LOC (contract);
+  if (std_source_loc)
+    {
+      std_source_loc = convert_from_reference (std_source_loc);
+      if (!really_constant_p (std_source_loc))
+	can_be_const = false;
+    }
+  else    
+    std_source_loc = build_contracts_source_location (EXPR_LOCATION (contract));
+
+  if (!builtin_contract_violation_type)
+    init_builtin_contract_violation_type ();
+
   /* Must match the type layout in builtin_contract_violation_type.  */
+  tree f0 = TYPE_FIELDS (builtin_contract_violation_type);
+  tree f1 = DECL_CHAIN (f0);
+  tree f2 = DECL_CHAIN (f1);
+  tree f3 = DECL_CHAIN (f2);
+  tree f4 = DECL_CHAIN (f3);
+  tree f5 = DECL_CHAIN (f4);
+  tree f6 = DECL_CHAIN (f5);
+  tree f7 = DECL_CHAIN (f6);
   tree ctor = build_constructor_va
     (builtin_contract_violation_type, 8,
-     NULL_TREE, build_int_cst (uint16_type_node, version),
-     NULL_TREE, build_int_cst (uint16_type_node, assertion_kind),
-     NULL_TREE, build_int_cst (uint16_type_node, evaluation_semantic),
-     NULL_TREE, build_int_cst (uint16_type_node, detection_mode),
-     NULL_TREE, CONTRACT_COMMENT (contract),
-     NULL_TREE, build_contracts_source_location (EXPR_LOCATION (contract)),
-     NULL_TREE, build_zero_cst (nullptr_type_node),  // exception
-     NULL_TREE, build_zero_cst (nullptr_type_node)); // __vendor_ext
+     f0, build_int_cst (uint16_type_node, version),
+     f1, assertion_kind,
+     f2, eval_semantic,
+     f3, build_int_cst (uint16_type_node, detection_mode),
+     f4, comment,
+     f5, build1 (VIEW_CONVERT_EXPR, TREE_TYPE (f5), std_source_loc),
+     f6, build_zero_cst (nullptr_type_node),  // thrown obj ptr
+     f7, build_zero_cst (nullptr_type_node));  // __vendor_ext
 
   TREE_READONLY (ctor) = true;
-  TREE_CONSTANT (ctor) = true;
-  TREE_STATIC (ctor) = true;
+  if (can_be_const)
+    TREE_CONSTANT (ctor) = true;
 
+  return ctor;
+}
+
+static tree
+build_contract_violation_p2900_constant (tree ctor, tree contract, bool is_const)
+{
   tree viol_ = contracts_tu_local_named_var
     (EXPR_LOCATION (contract), "Lcontract_violation",
-     builtin_contract_violation_type, /*is_const*/true);
+     get_builtin_contract_violation_type (), /*is_const*/true);
 
+//  TREE_STATIC (ctor) = true;
   TREE_CONSTANT (viol_) = is_const;
   DECL_INITIAL (viol_) = ctor;
   varpool_node::finalize_decl (viol_);
 
   return viol_;
+}
+
+static tree
+build_contract_violation_p2900_var (tree ctor, tree contract)
+{
+  location_t loc = EXPR_LOCATION (contract);
+  tree a_type
+    = strip_top_quals (non_reference (get_builtin_contract_violation_type ()));
+  tree viol_ = build_decl (loc, VAR_DECL, NULL_TREE, a_type);
+  DECL_SOURCE_LOCATION (viol_) = loc;
+  DECL_CONTEXT (viol_) = current_function_decl;
+  DECL_ARTIFICIAL (viol_) = true;
+  layout_decl (viol_, 0);
+  DECL_INITIAL (viol_) = ctor;
+  return viol_;
+}
+
+static tree
+build_contract_violation_p2900 (tree contract, bool is_const)
+{
+  tree ctor = build_contract_violation_p2900_ctor (contract);
+  return build_contract_violation_p2900_constant (ctor, contract, is_const);
 }
 
 /* Return a VAR_DECL to pass to handle_contract_violation.  */
@@ -2524,7 +2624,7 @@ declare_violation_handler_wrappers ()
 
   iloc_sentinel ils (input_location);
   input_location = BUILTINS_LOCATION;
-  tree v_obj_type = builtin_contract_violation_type;
+  tree v_obj_type = get_builtin_contract_violation_type ();
   v_obj_type = cp_build_qualified_type (v_obj_type, TYPE_QUAL_CONST);
   v_obj_type = cp_build_reference_type (v_obj_type, /*rval*/false);
   tree fn_type = build_function_type_list (void_type_node, v_obj_type,
@@ -2573,7 +2673,7 @@ build_contract_check_p2900 (tree contract)
 			   && !expr_noexcept_p (condition, tf_none);
 
   /* Build a read-only violation object, with the contract settings.  */
-  tree violation = build_contract_violation (contract, /*is_const*/true);
+//  tree violation = build_contract_violation (contract, /*is_const*/true);
   /* Build a statement expression to hold a contract check, with the check
      potentially wrapped in a try-catch expr.  */
   tree cc_bind = build3 (BIND_EXPR, void_type_node, NULL, NULL, NULL);
@@ -2584,6 +2684,18 @@ build_contract_check_p2900 (tree contract)
     emit_builtin_observable ();
   tree cond = build_x_unary_op (loc, TRUTH_NOT_EXPR, condition, NULL_TREE,
 				tf_warning_or_error);
+  tree ctor = build_contract_violation_p2900_ctor (contract);
+  tree violation = NULL_TREE;
+  bool viol_is_var = false;
+  if (TREE_CONSTANT (ctor))
+    violation = build_contract_violation_p2900_constant (ctor, contract, /*is_const*/true);
+  else
+    {
+      violation = build_contract_violation_p2900_var (ctor, contract);
+      add_decl_expr (violation);
+      BIND_EXPR_VARS (cc_bind) = violation;
+      viol_is_var = true;
+    }
   /* So now do we need a try-catch?  */
   if (check_might_throw)
     {
@@ -2594,6 +2706,8 @@ build_contract_check_p2900 (tree contract)
       DECL_CONTEXT (check_failed) = current_function_decl;
       layout_decl (check_failed, 0);
       add_decl_expr (check_failed);
+      DECL_CHAIN (check_failed) = BIND_EXPR_VARS (cc_bind);
+      BIND_EXPR_VARS (cc_bind) = check_failed;
       /* This will let us check if we had an exception.  */
       tree no_excp_ = build_decl (loc, VAR_DECL, NULL, boolean_type_node);
       DECL_ARTIFICIAL (no_excp_) = true;
@@ -2602,8 +2716,8 @@ build_contract_check_p2900 (tree contract)
       DECL_INITIAL (no_excp_) = boolean_true_node;
       layout_decl (no_excp_, 0);
       add_decl_expr (no_excp_);
-      DECL_CHAIN (check_failed) = no_excp_;
-      BIND_EXPR_VARS (cc_bind) = check_failed;
+      DECL_CHAIN (no_excp_) = BIND_EXPR_VARS (cc_bind);
+      BIND_EXPR_VARS (cc_bind) = no_excp_;
 
       tree check_try = begin_try_block ();
       finish_expr_stmt (cp_build_init_expr (check_failed, cond));
@@ -2613,12 +2727,34 @@ build_contract_check_p2900 (tree contract)
       tree e = cp_build_modify_expr (loc, no_excp_, NOP_EXPR, boolean_false_node,
 				     tf_warning_or_error);
       finish_expr_stmt (e);
-      finish_expr_stmt (build_call_n (__tu_has_violation_exception, 2,
-				      build_address (violation),
-				      build_int_cst (uint16_type_node, semantic)));
+      tree s_const = build_int_cst (uint16_type_node, semantic);
+      if (viol_is_var)
+	{
+	  /* We can update the detection mode here.  */
+	  tree memb
+	    = lookup_member (get_builtin_contract_violation_type (),
+			     get_identifier ("_M_detection_mode"),
+			     1, 0, tf_warning_or_error);
+	  tree r
+	    = build_class_member_access_expr (violation, memb, NULL_TREE, false,
+					      tf_warning_or_error);
+	  r = cp_build_modify_expr (loc, r, NOP_EXPR,
+				build_int_cst (uint16_type_node, (uint16_t)CDM_EVAL_EXCEPTION),
+				tf_warning_or_error);
+	  finish_expr_stmt (r);
+	  finish_expr_stmt (build_call_n (__tu_has_violation, 2,
+					  build_address (violation),
+					  s_const));
+	}
+      else
+	/* We need to make a copy of the violation object to update.  */
+	finish_expr_stmt (build_call_n (__tu_has_violation_exception, 2,
+					build_address (violation),
+					s_const));
       finish_handler (handler);
       finish_handler_sequence (check_try);
       cond = build2 (TRUTH_ANDIF_EXPR, boolean_type_node, check_failed, no_excp_);
+      BIND_EXPR_VARS (cc_bind) = nreverse (BIND_EXPR_VARS (cc_bind));
     }
 
   tree do_check = begin_if_stmt ();
@@ -4003,6 +4139,67 @@ finish_contract_data (location_t loc, tree obj, tree memb_id,
   if (conv && conv != error_mark_node)
     res = build1 (VIEW_CONVERT_EXPR, conv, res);
   return res;
+}
+
+/* Finish __builtin_contract_violation_with (comment[[, semantic[, kind]]).
+   Will probably eventually live in semantics.cc.  */
+
+tree
+finish_builtin_contract_violation_with (location_t loc, vec<tree, va_gc> *vec,
+					tsubst_flags_t complain)
+{
+  tree comment = (*vec)[0];
+  tree orig_comment = comment;
+  // check type here.
+  if (!type_dependent_expression_p (comment))
+    comment = decay_conversion (comment, complain);
+  if (error_operand_p (comment))
+    return error_mark_node;
+    
+  tree std_src_loc = NULL_TREE;
+  if (vec->length () > 1)
+    {
+      std_src_loc = (*vec)[1];
+      // check type here.
+      if (!type_dependent_expression_p (std_src_loc))
+	std_src_loc = decay_conversion (std_src_loc, complain);
+      if (error_operand_p (std_src_loc))
+	return error_mark_node;
+    }
+
+  tree semantic = NULL_TREE;
+  if (vec->length () > 2)
+    {
+      semantic = (*vec)[2];
+      // check type here.
+      if (!type_dependent_expression_p (semantic))
+	semantic = decay_conversion (semantic, complain);
+      if (error_operand_p (semantic))
+	return error_mark_node;
+    }
+
+  tree kind = NULL_TREE;
+  if (vec->length () > 3)
+    {
+      kind = (*vec)[3];
+      // check type here.
+      if (!type_dependent_expression_p (kind))
+	kind = decay_conversion (kind, complain);
+      if (error_operand_p (kind))
+	return error_mark_node;
+    }
+
+  tree c = build5_loc (loc, ASSERTION_STMT, void_type_node, NULL_TREE,
+		       NULL_TREE, NULL_TREE, NULL_TREE, NULL_TREE);
+  if (processing_template_decl)
+    comment = orig_comment;
+  CONTRACT_EVALUATION_SEMANTIC (c) = semantic;
+  CONTRACT_ASSERTION_KIND (c) = kind;
+  CONTRACT_CONDITION (c) = boolean_false_node;
+  CONTRACT_COMMENT (c) = STRIP_NOPS (comment);
+  CONTRACT_STD_SOURCE_LOC (c) = std_src_loc;
+
+  return c;
 }
 
 #include "gt-cp-contracts.h"

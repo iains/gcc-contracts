@@ -138,53 +138,6 @@ void invoke_default_contract_violation_handler(const std::contracts::contract_vi
   __handle_contract_violation(violation);
 }
 
-// From P3290
-[[noreturn]] void handle_enforced_contract_violation(
-      const char* __comment,
-      const std::source_location &__location)
-{
-  contract_violation __violation{evaluation_semantic::enforce, assertion_kind::manual, __location, __comment};
-  handle_contract_violation(__violation);
-  std::terminate();
-}
-
-[[noreturn]] void handle_enforced_contract_violation(
-    const std::nothrow_t&,
-    const char* __comment,
-    const std::source_location &__location) noexcept
-{
-  contract_violation __violation{evaluation_semantic::enforce, assertion_kind::manual, __location, __comment};
-  handle_contract_violation(__violation);
-  std::terminate();
-}
-
-
-void handle_observed_contract_violation(
-      const char* __comment,
-      const std::source_location &__location)
-{
-  contract_violation __violation{evaluation_semantic::observe, assertion_kind::manual, __location, __comment};
-  handle_contract_violation(__violation);
-}
-
-void handle_observed_contract_violation(
-    const std::nothrow_t&,
-    const char* __comment,
-    const std::source_location &__location) noexcept
-{
-  contract_violation __violation{evaluation_semantic::observe, assertion_kind::manual,  __location, __comment};
-  handle_contract_violation(__violation);
-}
-
-[[noreturn]] void __handle_assert_contract_violation(
-    const char*__comment,
-    const std::source_location &__location) noexcept
-{
-  contract_violation __violation{evaluation_semantic::enforce, assertion_kind::cassert, __location, __comment};
-  handle_contract_violation(__violation);
-  std::terminate();
-}
-
 } // contracts
 } // std
 

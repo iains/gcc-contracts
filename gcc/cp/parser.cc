@@ -8041,6 +8041,7 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
     case RID_BUILTIN_SHUFFLE:
     case RID_BUILTIN_SHUFFLEVECTOR:
     case RID_BUILTIN_LAUNDER:
+    case RID_BUILTIN_CONTRACT_VIOLATION_WITH:
     case RID_BUILTIN_OBSERVABLE:
     case RID_BUILTIN_ASSOC_BARRIER:
     case RID_BUILTIN_OPERATOR_NEW:
@@ -8084,6 +8085,19 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 	      {
 		error_at (loc, "wrong number of arguments to "
 			       "%<__builtin_contract_data%>");
+		postfix_expression = error_mark_node;
+	      }
+	    break;
+
+	  case RID_BUILTIN_CONTRACT_VIOLATION_WITH:
+	    if (vec->length () >= 1 && vec->length () < 5)
+	      postfix_expression
+		= finish_builtin_contract_violation_with (loc, vec,
+							  tf_warning_or_error);
+	    else
+	      {
+		error_at (loc, "wrong number of arguments to "
+			       "%<__builtin_contract_violation_with%>");
 		postfix_expression = error_mark_node;
 	      }
 	    break;
@@ -32226,9 +32240,6 @@ cp_parser_function_contract_specifier (cp_parser *parser)
 	   || is_attribute_p ("post", contract_name)))
     /* If we don't have a valid contract start, return a marker.  */
     return void_list_node;
-
-  // this does not currently handle attribute-specifier-seqopt for
-  // a natural contract syntax.
 
   cp_lexer_consume_token (parser->lexer);
   location_t loc = token->location;
