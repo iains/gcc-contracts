@@ -34,7 +34,8 @@
 
 #include <source_location>
 #include <cstdint>
-#include <bits/exception_ptr.h>
+#include <exception> // std::terminate, std::exception_ptr
+#include <new> // for nothrow_t.
 #include <cxxabi.h>
 
 namespace std _GLIBCXX_VISIBILITY(default)
@@ -63,9 +64,12 @@ namespace contracts
       const char*,
       const std::source_location &__location = std::source_location::current()) noexcept;
 
-  [[noreturn]] void handle_quick_enforced_contract_violation(
+  [[noreturn]]
+  inline void
+  handle_quick_enforced_contract_violation(
       const char*,
-      const std::source_location &__location = std::source_location::current()) noexcept;
+      const std::source_location &__location = std::source_location::current()) noexcept
+  { std::terminate (); }
 
   [[noreturn]] void __handle_assert_contract_violation(
       const char*,
@@ -151,10 +155,6 @@ namespace contracts
 
     friend void handle_observed_contract_violation(
 	const std::nothrow_t&,
-	const char*,
-	const std::source_location &) noexcept;
-
-    friend void handle_quick_enforced_contract_violation(
 	const char*,
 	const std::source_location &) noexcept;
 

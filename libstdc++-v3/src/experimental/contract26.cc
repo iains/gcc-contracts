@@ -176,14 +176,6 @@ void handle_observed_contract_violation(
   handle_contract_violation(__violation);
 }
 
-[[noreturn]] void handle_quick_enforced_contract_violation(
-    const char*,
-    const std::source_location &) noexcept
-{
-  std::terminate();
-}
-
-
 [[noreturn]] void __handle_assert_contract_violation(
     const char*__comment,
     const std::source_location &__location) noexcept
