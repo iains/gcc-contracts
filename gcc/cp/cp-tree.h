@@ -236,7 +236,7 @@ enum cp_tree_index
     CPTI_DSO_HANDLE,
     CPTI_DCAST,
 
-    CPTI_PSEUDO_CONTRACT_VIOLATION,
+    CPTI_CONTRACT_VIOLATION_TYPE,
 
     CPTI_MAX
 };
@@ -266,7 +266,7 @@ extern GTY(()) tree cp_global_trees[CPTI_MAX];
 #define current_aggr			cp_global_trees[CPTI_AGGR_TAG]
 /* std::align_val_t */
 #define align_type_node			cp_global_trees[CPTI_ALIGN_TYPE]
-#define pseudo_contract_violation_type	cp_global_trees[CPTI_PSEUDO_CONTRACT_VIOLATION]
+#define builtin_contract_violation_type	cp_global_trees[CPTI_CONTRACT_VIOLATION_TYPE]
 
 /* We cache these tree nodes so as to call get_identifier less frequently.
    For identifiers for functions, including special member functions such
@@ -9099,6 +9099,7 @@ extern tree co_await_get_resume_call		(tree await_expr);
 
 
 /* contracts.cc */
+extern tree init_builtin_contract_violation_type (void);
 extern tree make_postcondition_variable		(cp_expr);
 extern tree make_postcondition_variable		(cp_expr, tree);
 extern tree grok_contract			(tree, tree, tree, cp_expr, location_t);

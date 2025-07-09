@@ -148,6 +148,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "cgraph.h"
 #include "opts.h"
 #include "output.h"
+#include "langhooks.h"
 
 const int max_custom_roles = 32;
 static contract_role contract_build_roles[max_custom_roles] = {
@@ -2120,11 +2121,11 @@ get_cxx2a_contract_violation_fields ()
   return fields;
 }
 
-static tree
-get_pseudo_contract_violation_type ()
+tree
+init_builtin_contract_violation_type ()
 {
-  if (pseudo_contract_violation_type)
-    return pseudo_contract_violation_type;
+  if (builtin_contract_violation_type)
+    return builtin_contract_violation_type;
 
   tree fields;
   if (flag_contracts_nonattr)
@@ -2134,21 +2135,22 @@ get_pseudo_contract_violation_type ()
 
   iloc_sentinel ils (input_location);
   input_location = BUILTINS_LOCATION;
-  pseudo_contract_violation_type = make_class_type (RECORD_TYPE);
-  finish_builtin_struct (pseudo_contract_violation_type,
-			 "__pseudo_contract_violation", fields, NULL_TREE);
-  CLASSTYPE_AS_BASE (pseudo_contract_violation_type)
-    = pseudo_contract_violation_type;
-  DECL_CONTEXT (TYPE_NAME (pseudo_contract_violation_type))
+  builtin_contract_violation_type = make_class_type (RECORD_TYPE);
+  finish_builtin_struct (builtin_contract_violation_type,
+			 "__builtin_contract_violation_type", fields, NULL_TREE);
+  CLASSTYPE_AS_BASE (builtin_contract_violation_type)
+    = builtin_contract_violation_type;
+  DECL_CONTEXT (TYPE_NAME (builtin_contract_violation_type))
     = FROB_CONTEXT (global_namespace);
-//  TREE_PUBLIC (TYPE_NAME (pseudo_contract_violation_type)) = true;
-  CLASSTYPE_LITERAL_P (pseudo_contract_violation_type) = true;
-  CLASSTYPE_LAZY_COPY_CTOR (pseudo_contract_violation_type) = true;
-  xref_basetypes (pseudo_contract_violation_type, /*bases=*/NULL_TREE);
-  pseudo_contract_violation_type
-    = cp_build_qualified_type (pseudo_contract_violation_type,
+  TREE_PUBLIC (TYPE_NAME (builtin_contract_violation_type)) = true;
+  CLASSTYPE_LITERAL_P (builtin_contract_violation_type) = true;
+  CLASSTYPE_LAZY_COPY_CTOR (builtin_contract_violation_type) = true;
+  xref_basetypes (builtin_contract_violation_type, /*bases=*/NULL_TREE);
+  lang_hooks.types.register_builtin_type (builtin_contract_violation_type, "__builtin_contract_violation_type");
+  builtin_contract_violation_type
+    = cp_build_qualified_type (builtin_contract_violation_type,
 			       TYPE_QUAL_CONST);
-  return pseudo_contract_violation_type;
+  return builtin_contract_violation_type;
 }
 
 /* Get name of contract_level of the specified contract. Used when building
@@ -2198,7 +2200,7 @@ build_contract_violation_cxx2a (tree contract)
     default: gcc_unreachable ();
     }
 
-  /* Must match the type layout in get_pseudo_contract_violation_type.  */
+  /* Must match the type layout in builtin_contract_violation_type.  */
   tree ctor = build_constructor_va
     (init_list_type_node, 7,
      NULL_TREE, build_string_literal (loc.file),
@@ -2209,7 +2211,7 @@ build_contract_violation_cxx2a (tree contract)
      NULL_TREE, build_int_cst (uint_least32_type_node, loc.line),
      NULL_TREE, build_int_cst (signed_char_type_node, cmode));
 
-  ctor = finish_compound_literal (get_pseudo_contract_violation_type (),
+  ctor = finish_compound_literal (builtin_contract_violation_type,
 				  ctor, tf_none, fcl_c99);
   protected_set_expr_location (ctor, EXPR_LOCATION (contract));
   return ctor;
@@ -2291,9 +2293,9 @@ build_contract_violation_p2900 (tree contract, bool is_const)
   /* we hardcode CDM_PREDICATE_FALSE because that's all we support for now */
   uint16_t detection_mode = CDM_PREDICATE_FALSE;
 
-  /* Must match the type layout in get_pseudo_contract_violation_type.  */
+  /* Must match the type layout in builtin_contract_violation_type.  */
   tree ctor = build_constructor_va
-    (get_pseudo_contract_violation_type (), 8,
+    (builtin_contract_violation_type, 8,
      NULL_TREE, build_int_cst (uint16_type_node, version),
      NULL_TREE, build_int_cst (uint16_type_node, assertion_kind),
      NULL_TREE, build_int_cst (uint16_type_node, evaluation_semantic),
@@ -2309,7 +2311,7 @@ build_contract_violation_p2900 (tree contract, bool is_const)
 
   tree viol_ = contracts_tu_local_named_var
     (EXPR_LOCATION (contract), "Lcontract_violation",
-     get_pseudo_contract_violation_type (), /*is_const*/true);
+     builtin_contract_violation_type, /*is_const*/true);
 
   TREE_CONSTANT (viol_) = is_const;
   DECL_INITIAL (viol_) = ctor;
@@ -2518,7 +2520,7 @@ declare_violation_handler_wrappers ()
 
   iloc_sentinel ils (input_location);
   input_location = BUILTINS_LOCATION;
-  tree v_obj_type = get_pseudo_contract_violation_type ();
+  tree v_obj_type = builtin_contract_violation_type;
   v_obj_type = cp_build_qualified_type (v_obj_type, TYPE_QUAL_CONST);
   v_obj_type = cp_build_reference_type (v_obj_type, /*rval*/false);
   tree fn_type = build_function_type_list (void_type_node, v_obj_type,
