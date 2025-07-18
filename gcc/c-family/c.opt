@@ -2001,6 +2001,10 @@ fcontracts-on-virtual-functions=
 C++ Joined RejectNegative Enum(contract_inheritance) Var(flag_contracts_on_virtual_functions) Init(0)
 -fcontracts-on-virtual-functions=[none|P2900R13|P3653] Select how contracts are inherited for virtual functions
 
+fcontracts-builtins
+C++ ObjC++ Var(flag_contracts_builtins) Init(1)
+Enable __builtin contract_violation_type,  contract_data and  violation_with
+
 Wsuggest-explicit-contract
 C++ ObjC++ Var(suggest_explicit_contract) Warning
 Warn about functions with implicitly inherited contracts.

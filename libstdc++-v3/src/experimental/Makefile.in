@@ -806,6 +806,9 @@ uninstall-am: uninstall-toolexeclibLTLIBRARIES
 .PRECIOUS: Makefile
 
 
+contract26.lo: contract26.cc
+	$(LTCXXCOMPILE) -std=gnu++26 -fcontracts -fcontracts-nonattr -c $<
+
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

@@ -580,11 +580,9 @@ names_builtin_p (const char *name)
     {
     case RID_ADDRESSOF:
     case RID_BUILTIN_CONVERTVECTOR:
-    case RID_BUILTIN_CONTRACT_DATA:
     case RID_BUILTIN_HAS_ATTRIBUTE:
     case RID_BUILTIN_SHUFFLE:
     case RID_BUILTIN_SHUFFLEVECTOR:
-    case RID_BUILTIN_CONTRACT_VIOLATION_WITH:
     case RID_BUILTIN_LAUNDER:
     case RID_BUILTIN_OBSERVABLE:
     case RID_BUILTIN_ASSOC_BARRIER:
@@ -595,6 +593,11 @@ names_builtin_p (const char *name)
     case RID_BUILTIN_OPERATOR_NEW:
     case RID_BUILTIN_OPERATOR_DELETE:
       return 201802L;
+    case RID_BUILTIN_CONTRACT_DATA:
+    case RID_BUILTIN_CONTRACT_VIOLATION_WITH:
+      if (flag_contracts_builtins)
+	return 1;
+      return 0;
     default:
       break;
     }

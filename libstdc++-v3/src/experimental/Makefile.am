@@ -71,6 +71,9 @@ AM_CXXFLAGS = \
 AM_MAKEFLAGS = \
 	"gxx_include_dir=$(gxx_include_dir)"
 
+contract26.lo: contract26.cc
+	$(LTCXXCOMPILE) -std=gnu++26 -fcontracts -fcontracts-nonattr -c $<
+
 # Libtool notes
 
 # 1) In general, libtool expects an argument such as `--tag=CXX' when

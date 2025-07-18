@@ -38,6 +38,8 @@
 #include <new> // for nothrow_t.
 #include <cxxabi.h>
 
+#ifdef __cpp_contracts
+
 namespace std _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
@@ -45,14 +47,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 namespace contracts
 {
   // From P2900R14 + D3290R3
-
   enum class assertion_kind : uint16_t {
     pre = 1,
     post = 2,
     assert = 3,
-    // From D3290R3
-    manual = 4,
-    cassert = 5,
+    manual = 4, // From D3290R3
+    cassert = 5, // From D3290R3
 
     /* Implementation−defined values should have a minimum value of 1000. */
   };
@@ -72,8 +72,7 @@ namespace contracts
   };
 
   enum class detection_mode : uint16_t {
-    // From D3290R3
-    unspecified = 0,
+    unspecified = 0,  // From D3290R3
     predicate_false = 1,
     evaluation_exception = 2,
 
@@ -84,6 +83,45 @@ namespace contracts
   using __vendor_ext = void;
 
   class contract_violation {
+#if __cpp_contracts >= 202502L
+
+    __builtin_contract_violation_type __impl;
+
+  public:
+    const auto version () const noexcept {
+      return __builtin_contract_data (this, 0);
+    }
+    const assertion_kind kind () const noexcept {
+      return __builtin_contract_data (this, 1);
+    }
+    const evaluation_semantic semantic() const noexcept {
+      return __builtin_contract_data (this, 2);
+    }
+    const detection_mode mode () const noexcept {
+      return __builtin_contract_data (this, 3);
+    }
+    const char* comment () const noexcept {
+      return __builtin_contract_data (this, 4);
+    }
+    const std::source_location location () const noexcept {
+      return __builtin_contract_data (this, 5);
+    }
+
+    std::exception_ptr
+    evaluation_exception () const noexcept {
+      if (mode () == std::contracts::detection_mode::evaluation_exception)
+	return std::exception_ptr (__builtin_contract_data (this, 6));
+      return std::exception_ptr ();
+    }
+    __vendor_ext *ext() const noexcept {
+      return __builtin_contract_data (this, 7);
+    }
+
+    bool is_terminating () const noexcept {
+      return semantic () == evaluation_semantic::enforce
+	    || semantic () == evaluation_semantic::quick_enforce;
+    }
+#else
     uint16_t _M_version;
     assertion_kind _M_assertion_kind;
     evaluation_semantic _M_evaluation_semantic;
@@ -117,6 +155,7 @@ namespace contracts
       return _M_evaluation_semantic == std::contracts::evaluation_semantic::enforce
 	    || _M_evaluation_semantic == std::contracts::evaluation_semantic::quick_enforce;
     }
+#endif
   };
 
   void invoke_default_contract_violation_handler(const contract_violation&) noexcept;
@@ -179,5 +218,7 @@ namespace contracts
 
 _GLIBCXX_END_NAMESPACE_VERSION
 } // namespace std
+
+#endif // __cpp_contracts
 
 #endif // _GLIBCXX_CONTRACTS

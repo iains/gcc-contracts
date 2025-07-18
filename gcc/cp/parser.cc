@@ -8077,6 +8077,11 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 	    break;
 
 	  case RID_BUILTIN_CONTRACT_DATA:
+	    if (!flag_contracts_builtins)
+	      {
+		error_at (loc, "%<__builtin_contract_data%> is not available");
+		postfix_expression = error_mark_node;
+	      }
 	    if (vec->length () == 2)
 	      postfix_expression
 		= finish_contract_data (loc, (*vec)[0], (*vec)[1],
@@ -8090,6 +8095,11 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 	    break;
 
 	  case RID_BUILTIN_CONTRACT_VIOLATION_WITH:
+	    if (!flag_contracts_builtins)
+	      {
+		error_at (loc, "%<__builtin_contract_violation_with%> is not available");
+		postfix_expression = error_mark_node;
+	      }
 	    if (vec->length () >= 1 && vec->length () < 5)
 	      postfix_expression
 		= finish_builtin_contract_violation_with (loc, vec,

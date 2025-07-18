@@ -2130,6 +2130,10 @@ init_builtin_contract_violation_type ()
   if (builtin_contract_violation_type)
     return builtin_contract_violation_type;
 
+  /* We are creating types here.  */
+  auto module_kind_override = make_temp_override
+    (module_kind, module_kind & ~(MK_PURVIEW | MK_ATTACH | MK_EXPORTING));
+
   tree fields;
   if (flag_contracts_nonattr)
     fields = get_p9600_contract_violation_fields ();
@@ -2149,7 +2153,9 @@ init_builtin_contract_violation_type ()
   CLASSTYPE_LITERAL_P (builtin_contract_violation_type) = true;
   CLASSTYPE_LAZY_COPY_CTOR (builtin_contract_violation_type) = true;
   xref_basetypes (builtin_contract_violation_type, /*bases=*/NULL_TREE);
-  lang_hooks.types.register_builtin_type (builtin_contract_violation_type, "__builtin_contract_violation_type");
+  /* Publish the type if enabled.  */
+  if (flag_contracts_builtins)
+    lang_hooks.types.register_builtin_type (builtin_contract_violation_type, "__builtin_contract_violation_type");
   builtin_contract_violation_type
     = cp_build_qualified_type (builtin_contract_violation_type,
 			       TYPE_QUAL_CONST);
@@ -2424,6 +2430,9 @@ build_contract_violation_p2900 (tree contract, bool is_const)
 static tree
 build_contract_violation (tree contract, bool is_const)
 {
+  if (!builtin_contract_violation_type)
+    init_builtin_contract_violation_type ();
+
   if (flag_contracts_nonattr)
     return build_contract_violation_p2900 (contract, is_const);
 
@@ -2621,6 +2630,9 @@ declare_violation_handler_wrappers ()
 {
   if (__tu_has_violation && __tu_has_violation_exception)
     return;
+
+  if (!builtin_contract_violation_type)
+    init_builtin_contract_violation_type ();
 
   iloc_sentinel ils (input_location);
   input_location = BUILTINS_LOCATION;
