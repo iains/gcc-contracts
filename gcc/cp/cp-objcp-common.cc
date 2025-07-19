@@ -580,6 +580,7 @@ names_builtin_p (const char *name)
     {
     case RID_ADDRESSOF:
     case RID_BUILTIN_CONVERTVECTOR:
+    case RID_BUILTIN_CONTRACT_DATA:
     case RID_BUILTIN_HAS_ATTRIBUTE:
     case RID_BUILTIN_SHUFFLE:
     case RID_BUILTIN_SHUFFLEVECTOR:

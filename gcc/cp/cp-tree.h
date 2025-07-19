@@ -9114,6 +9114,8 @@ extern bool emit_contract_wrapper_func          (bool);
 extern tree remove_contract_attributes		(tree);
 extern void set_contract_attributes 		(tree, tree);
 extern void maybe_emit_violation_handler_wrappers (void);
+extern tree finish_contract_data		(location_t, tree, tree,
+						 tsubst_flags_t);
 
 /* Return the first contract in ATTRS, or NULL_TREE if there are none.  */
 

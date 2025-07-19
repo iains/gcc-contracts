@@ -8037,6 +8037,7 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
       break;
 
     case RID_ADDRESSOF:
+    case RID_BUILTIN_CONTRACT_DATA:
     case RID_BUILTIN_SHUFFLE:
     case RID_BUILTIN_SHUFFLEVECTOR:
     case RID_BUILTIN_LAUNDER:
@@ -8070,6 +8071,19 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p,
 	      {
 		error_at (loc, "wrong number of arguments to "
 			       "%<__builtin_addressof%>");
+		postfix_expression = error_mark_node;
+	      }
+	    break;
+
+	  case RID_BUILTIN_CONTRACT_DATA:
+	    if (vec->length () == 2)
+	      postfix_expression
+		= finish_contract_data (loc, (*vec)[0], (*vec)[1],
+					tf_warning_or_error);
+	    else
+	      {
+		error_at (loc, "wrong number of arguments to "
+			       "%<__builtin_contract_data%>");
 		postfix_expression = error_mark_node;
 	      }
 	    break;

@@ -3922,4 +3922,87 @@ maybe_emit_violation_handler_wrappers ()
   expand_or_defer_fn (__tu_has_violation_exception);
 }
 
+static bool
+valid_violation_object (tree obj)
+{
+  tree o_type = TREE_TYPE (obj);
+  if (!POINTER_TYPE_P (o_type))
+    return false;
+  o_type = TREE_TYPE (o_type);
+  if (strncmp (TYPE_NAME_STRING (o_type), "contract_violation", 18) != 0)
+    return false;
+  tree t_name = TYPE_NAME (o_type);
+  tree ns = lookup_qualified_name (std_node, get_identifier ("contracts"),
+				   LOOK_want::NAMESPACE);
+  if (!t_name || DECL_CONTEXT (t_name) != ns)
+    return false;
+  tree f = next_aggregate_field (TYPE_FIELDS (o_type));
+  if (!f || !TREE_TYPE (f)
+      || strncmp (TYPE_NAME_STRING (TREE_TYPE (f)),
+		  "__builtin_contract_violation_type", 33) != 0)
+    return false;
+  return true;
+}
+
+tree
+finish_contract_data (location_t loc, tree obj, tree memb_id,
+		      tsubst_flags_t complain)
+{
+  STRIP_NOPS (obj);
+  if (!is_this_parameter (obj)
+      || !valid_violation_object (obj))
+    {
+      error_at (loc, "the first argument to %qs must be a %<this%> pointer to a"
+		" valid object of type %<std::contracts::contract_violation%>",
+		"__builtin_contract_data");
+      return error_mark_node;
+    }
+
+  STRIP_NOPS (memb_id);
+  if (TREE_CODE (memb_id) != INTEGER_CST || tree_to_uhwi (memb_id) > 7)
+    {
+      error_at (loc, "the second argument to %qs must be an integral constant"
+		" between 0 and 7", "__builtin_contract_data");
+      return error_mark_node;
+    }
+
+  tree o_type = TREE_TYPE (TREE_TYPE (obj));
+  tree impl_f = next_aggregate_field (TYPE_FIELDS (o_type));
+  tree i_type = TREE_TYPE (impl_f);
+  tree field = next_aggregate_field (TYPE_FIELDS (i_type));
+  unsigned midx = tree_to_uhwi (memb_id);
+  for (;midx > 0 && field; field = next_aggregate_field (DECL_CHAIN (field)))
+    midx--;
+  gcc_checking_assert (field);
+  obj = cp_build_indirect_ref (loc, obj, RO_UNARY_STAR, complain);
+  tree res = build_class_member_access_expr (obj, impl_f, NULL_TREE,
+					     /*ref*/true, complain);
+  res = build_class_member_access_expr (res, field, NULL_TREE,
+					/*ref*/true, complain);
+  tree conv = NULL_TREE;
+  switch (tree_to_uhwi (memb_id))
+    {
+      default:
+	break;
+      case 1:
+        conv = lookup_std_contracts_type (get_identifier ("contracts"),
+					  get_identifier ("assertion_kind"));
+	break;
+      case 2:
+        conv = lookup_std_contracts_type (get_identifier ("contracts"),
+					  get_identifier ("evaluation_semantic"));
+	break;
+      case 3:
+        conv = lookup_std_contracts_type (get_identifier ("contracts"),
+					  get_identifier ("detection_mode"));
+	break;
+      case 5:
+        conv = lookup_std_type (get_identifier ("source_location"));
+	break;
+    }
+  if (conv && conv != error_mark_node)
+    res = build1 (VIEW_CONVERT_EXPR, conv, res);
+  return res;
+}
+
 #include "gt-cp-contracts.h"
