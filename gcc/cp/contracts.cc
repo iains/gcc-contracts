@@ -1867,7 +1867,6 @@ build_contract_wrapper_function (tree fndecl)
   return wrapdecl;
 }
 
-
 /* Lookup a name in std::, or inject it.  */
 
 static tree
@@ -2331,38 +2330,43 @@ build_contract_violation (tree contract, bool is_const)
   return build_contract_violation_cxx2a (contract);
 }
 
-/* Lookup a name in std::contracts/experimental, or inject it.  */
-static tree
-lookup_std_contracts_type (tree name_id)
-{
-  tree id_exp = NULL_TREE;
-  if (flag_contracts_nonattr)
-      id_exp = get_identifier ("contracts");
-  else
-      id_exp = get_identifier ("experimental");
+/* Lookup a name in std::contracts/experimental.  */
 
-  tree ns_exp = lookup_qualified_name (std_node, id_exp);
+static tree
+lookup_std_contracts_type (tree contract_ns, tree name_id)
+{
+  tree ns_exp = lookup_qualified_name (std_node, contract_ns);
 
   tree res_type = error_mark_node;
   if (TREE_CODE (ns_exp) == NAMESPACE_DECL)
     res_type = lookup_qualified_name (ns_exp, name_id,
 				       LOOK_want::TYPE
 				       |LOOK_want::HIDDEN_FRIEND);
-
   if (TREE_CODE (res_type) == TYPE_DECL)
     res_type = TREE_TYPE (res_type);
-  else
-    {
-      push_nested_namespace (std_node);
-      push_namespace (id_exp, /*inline*/false);
-      res_type = make_class_type (RECORD_TYPE);
-      create_implicit_typedef (name_id, res_type);
-      DECL_SOURCE_LOCATION (TYPE_NAME (res_type)) = BUILTINS_LOCATION;
-      DECL_CONTEXT (TYPE_NAME (res_type)) = current_namespace;
-      pushdecl_namespace_level (TYPE_NAME (res_type), /*hidden*/true);
-      pop_namespace ();
-      pop_nested_namespace (std_node);
-    }
+  return res_type;
+}
+
+/* Lookup a name in std::contracts/experimental, or inject it.  */
+
+static tree
+lookup_or_inject_std_contracts_type (tree name_id)
+{
+  tree id_exp = flag_contracts_nonattr  ? get_identifier ("contracts")
+					: get_identifier ("experimental");
+  tree res_type = lookup_std_contracts_type (id_exp, name_id);
+  if (res_type && res_type != error_mark_node)
+    return res_type;
+
+  push_nested_namespace (std_node);
+  push_namespace (id_exp, /*inline*/false);
+  res_type = make_class_type (RECORD_TYPE);
+  create_implicit_typedef (name_id, res_type);
+  DECL_SOURCE_LOCATION (TYPE_NAME (res_type)) = BUILTINS_LOCATION;
+  DECL_CONTEXT (TYPE_NAME (res_type)) = current_namespace;
+  pushdecl_namespace_level (TYPE_NAME (res_type), /*hidden*/true);
+  pop_namespace ();
+  pop_nested_namespace (std_node);
   return res_type;
 }
 
@@ -2391,7 +2395,7 @@ declare_handle_contract_violation ()
 	    return f;
 	}
 
-  tree violation = lookup_std_contracts_type (viol_name);
+  tree violation = lookup_or_inject_std_contracts_type (viol_name);
   
   tree fntype = NULL_TREE;
   tree v_obj_ref = cp_build_qualified_type (violation, TYPE_QUAL_CONST);
