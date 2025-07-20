@@ -1989,6 +1989,14 @@ ftms = {
 };
 
 ftms = {
+  name = inplace_vector;
+  values = {
+    v = 202406;
+    cxxmin = 26;
+  };
+};
+
+ftms = {
   name = indirect;
   values = {
     v = 202502;
@@ -2052,8 +2060,10 @@ ftms = {
 
 ftms = {
   name = constexpr_exceptions;
+  // TODO Remove when PR121114 is resolved
+  no_stdname = true;
   values = {
-    v = 202502;
+    v = 1; // TODO 202411;
     cxxmin = 26;
     extra_cond = "__cpp_constexpr_exceptions >= 202411L";
   };

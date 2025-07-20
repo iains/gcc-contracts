@@ -3742,6 +3742,11 @@ finish_unary_op_expr (location_t op_loc, enum tree_code code, cp_expr expr,
   if (!(complain & tf_warning))
     return result;
 
+  /* These will never fold into a constant, so no need to check for
+     overflow for them.  */
+  if (code == PREINCREMENT_EXPR || code == PREDECREMENT_EXPR)
+    return result;
+
   tree result_ovl = result;
   tree expr_ovl = expr;
 
@@ -6328,9 +6333,7 @@ handle_omp_array_sections (tree &c, enum c_omp_region_type ort)
   tree *tp = &OMP_CLAUSE_DECL (c);
   if ((OMP_CLAUSE_CODE (c) == OMP_CLAUSE_DEPEND
        || OMP_CLAUSE_CODE (c) == OMP_CLAUSE_AFFINITY)
-      && TREE_CODE (*tp) == TREE_LIST
-      && TREE_PURPOSE (*tp)
-      && TREE_CODE (TREE_PURPOSE (*tp)) == TREE_VEC)
+      && OMP_ITERATOR_DECL_P (*tp))
     tp = &TREE_VALUE (*tp);
   tree first = handle_omp_array_sections_1 (c, *tp, types,
 					    maybe_zero_len, first_non_one,
@@ -8850,9 +8853,7 @@ finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	  /* FALLTHRU */
 	case OMP_CLAUSE_AFFINITY:
 	  t = OMP_CLAUSE_DECL (c);
-	  if (TREE_CODE (t) == TREE_LIST
-	      && TREE_PURPOSE (t)
-	      && TREE_CODE (TREE_PURPOSE (t)) == TREE_VEC)
+	  if (OMP_ITERATOR_DECL_P (t))
 	    {
 	      if (TREE_PURPOSE (t) != last_iterators)
 		last_iterators_remove

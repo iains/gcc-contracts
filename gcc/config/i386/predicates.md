@@ -573,8 +573,8 @@
 
     case CONST:
       op = XEXP (op, 0);
-      if (GET_CODE (op) == SYMBOL_REF
-	  || GET_CODE (op) == LABEL_REF
+      if (SYMBOL_REF_P (op)
+	  || LABEL_REF_P (op)
 	  || (GET_CODE (op) == UNSPEC
 	      && (XINT (op, 1) == UNSPEC_GOT
 		  || XINT (op, 1) == UNSPEC_GOTOFF
@@ -586,8 +586,8 @@
 	return false;
 
       op = XEXP (op, 0);
-      if (GET_CODE (op) == SYMBOL_REF
-	  || GET_CODE (op) == LABEL_REF)
+      if (SYMBOL_REF_P (op)
+	  || LABEL_REF_P (op))
 	return true;
       /* Only @GOTOFF gets offsets.  */
       if (GET_CODE (op) != UNSPEC
@@ -595,8 +595,8 @@
 	return false;
 
       op = XVECEXP (op, 0, 0);
-      if (GET_CODE (op) == SYMBOL_REF
-	  || GET_CODE (op) == LABEL_REF)
+      if (SYMBOL_REF_P (op)
+	  || LABEL_REF_P (op))
 	return true;
       return false;
 
@@ -614,10 +614,10 @@
       && CONST_INT_P (XEXP (XEXP (op, 0), 1)))
     op = XEXP (XEXP (op, 0), 0);
 
-  if (GET_CODE (op) == LABEL_REF)
+  if (LABEL_REF_P (op))
     return true;
 
-  if (GET_CODE (op) != SYMBOL_REF)
+  if (!SYMBOL_REF_P (op))
     return false;
 
   if (SYMBOL_REF_TLS_MODEL (op))
@@ -649,7 +649,7 @@
       && CONST_INT_P (XEXP (XEXP (op, 0), 1)))
     op = XEXP (XEXP (op, 0), 0);
 
-  if (GET_CODE (op) == SYMBOL_REF
+  if (SYMBOL_REF_P (op)
       && !SYMBOL_REF_FUNCTION_P (op))
     return false;
 
@@ -1145,7 +1145,7 @@
   unsigned n_elts;
   op = avoid_constant_pool_reference (op);
 
-  if (GET_CODE (op) != CONST_VECTOR)
+  if (!CONST_VECTOR_P (op))
     return false;
 
   n_elts = CONST_VECTOR_NUNITS (op);
@@ -1173,7 +1173,7 @@
   if (MEM_P (op))
     {
       op = get_pool_constant (XEXP (op, 0));
-      if (GET_CODE (op) != CONST_VECTOR)
+      if (!CONST_VECTOR_P (op))
 	return false;
 
       if (GET_MODE (op) != mode
@@ -1422,8 +1422,8 @@
 	}
       if (TARGET_64BIT
 	  && flag_pic
-	  && (GET_CODE (disp) == SYMBOL_REF
-	      || GET_CODE (disp) == LABEL_REF))
+	  && (SYMBOL_REF_P (disp)
+	      || LABEL_REF_P (disp)))
 	return false;
     }
 

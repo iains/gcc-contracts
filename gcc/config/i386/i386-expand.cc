@@ -387,7 +387,7 @@ ix86_expand_move (machine_mode mode, rtx operands[])
       tmp = XEXP (op1, 0);
 
       if (GET_CODE (tmp) != PLUS
-	  || GET_CODE (XEXP (tmp, 0)) != SYMBOL_REF)
+	  || !SYMBOL_REF_P (XEXP (tmp, 0)))
 	break;
 
       op1 = XEXP (tmp, 0);
@@ -487,7 +487,7 @@ ix86_expand_move (machine_mode mode, rtx operands[])
 		op1 = machopic_legitimize_pic_address (op1, mode,
 						       tmp == op1 ? 0 : tmp);
 	    }
-	  if (op0 != op1 && GET_CODE (op0) != MEM)
+	  if (op0 != op1 && !MEM_P (op0))
 	    {
 	      rtx insn = gen_rtx_SET (op0, op1);
 	      emit_insn (insn);
@@ -1396,11 +1396,11 @@ ix86_expand_vector_logical_operator (enum rtx_code code, machine_mode mode,
      to cast them temporarily to integer vectors.  */
   if (op1
       && !TARGET_SSE_PACKED_SINGLE_INSN_OPTIMAL
-      && (SUBREG_P (op2) || GET_CODE (op2) == CONST_VECTOR)
+      && (SUBREG_P (op2) || CONST_VECTOR_P (op2))
       && GET_MODE_CLASS (GET_MODE (SUBREG_REG (op1))) == MODE_VECTOR_FLOAT
       && GET_MODE_SIZE (GET_MODE (SUBREG_REG (op1))) == GET_MODE_SIZE (mode)
       && SUBREG_BYTE (op1) == 0
-      && (GET_CODE (op2) == CONST_VECTOR
+      && (CONST_VECTOR_P (op2)
 	  || (GET_MODE (SUBREG_REG (op1)) == GET_MODE (SUBREG_REG (op2))
 	      && SUBREG_BYTE (op2) == 0))
       && can_create_pseudo_p ())
@@ -1415,7 +1415,7 @@ ix86_expand_vector_logical_operator (enum rtx_code code, machine_mode mode,
 	case E_V4DFmode:
 	case E_V8DFmode:
 	  dst = gen_reg_rtx (GET_MODE (SUBREG_REG (op1)));
-	  if (GET_CODE (op2) == CONST_VECTOR)
+	  if (CONST_VECTOR_P (op2))
 	    {
 	      op2 = gen_lowpart (GET_MODE (dst), op2);
 	      op2 = force_reg (GET_MODE (dst), op2);
@@ -4918,7 +4918,7 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
 	case LEU:
 	  /* x <= cst can be handled as x < cst + 1 unless there is
 	     wrap around in cst + 1.  */
-	  if (GET_CODE (cop1) == CONST_VECTOR
+	  if (CONST_VECTOR_P (cop1)
 	      && GET_MODE_INNER (mode) != TImode)
 	    {
 	      unsigned int n_elts = GET_MODE_NUNITS (mode), i;
@@ -4962,7 +4962,7 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
 	case GEU:
 	  /* x >= cst can be handled as x > cst - 1 unless there is
 	     wrap around in cst - 1.  */
-	  if (GET_CODE (cop1) == CONST_VECTOR
+	  if (CONST_VECTOR_P (cop1)
 	      && GET_MODE_INNER (mode) != TImode)
 	    {
 	      unsigned int n_elts = GET_MODE_NUNITS (mode), i;
@@ -5033,9 +5033,9 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
 	    }
 	}
 
-      if (GET_CODE (cop0) == CONST_VECTOR)
+      if (CONST_VECTOR_P (cop0))
 	cop0 = force_reg (mode, cop0);
-      else if (GET_CODE (cop1) == CONST_VECTOR)
+      else if (CONST_VECTOR_P (cop1))
 	cop1 = force_reg (mode, cop1);
 
       rtx optrue = op_true ? op_true : CONSTM1_RTX (data_mode);
@@ -5234,7 +5234,7 @@ ix86_expand_int_sse_cmp (rtx dest, enum rtx_code code, rtx cop0, rtx cop1,
   if (*negate)
     std::swap (op_true, op_false);
 
-  if (GET_CODE (cop1) == CONST_VECTOR)
+  if (CONST_VECTOR_P (cop1))
     cop1 = force_reg (mode, cop1);
 
   /* Allow the comparison to be done in one mode, but the movcc to
@@ -6188,7 +6188,7 @@ ix86_extract_perm_from_pool_constant (int* perm, rtx mem)
 
   rtx constant = get_pool_constant (XEXP (mem, 0));
 
-  if (GET_CODE (constant) != CONST_VECTOR)
+  if (!CONST_VECTOR_P (constant))
     return false;
 
   /* There could be some rtx like
@@ -6198,7 +6198,7 @@ ix86_extract_perm_from_pool_constant (int* perm, rtx mem)
     {
       constant = simplify_subreg (mode, constant, GET_MODE (constant), 0);
 
-      if (constant == nullptr || GET_CODE (constant) != CONST_VECTOR)
+      if (constant == nullptr || !CONST_VECTOR_P (constant))
 	return false;
     }
 
@@ -6244,7 +6244,7 @@ ix86_split_to_parts (rtx operand, rtx *parts, machine_mode mode)
       return size;
     }
 
-  if (GET_CODE (operand) == CONST_VECTOR)
+  if (CONST_VECTOR_P (operand))
     {
       scalar_int_mode imode = int_mode_for_mode (mode).require ();
       /* Caution: if we looked through a constant pool memory above,
@@ -6378,7 +6378,7 @@ ix86_split_long_move (rtx operands[])
 	 fp moves, that force all constants to memory to allow combining.  */
 
       if (MEM_P (operands[1])
-	  && GET_CODE (XEXP (operands[1], 0)) == SYMBOL_REF
+	  && SYMBOL_REF_P (XEXP (operands[1], 0))
 	  && CONSTANT_POOL_ADDRESS_P (XEXP (operands[1], 0)))
 	operands[1] = get_pool_constant (XEXP (operands[1], 0));
       if (push_operand (operands[0], VOIDmode))
@@ -10245,7 +10245,7 @@ construct_plt_address (rtx symbol)
 {
   rtx tmp, unspec;
 
-  gcc_assert (GET_CODE (symbol) == SYMBOL_REF);
+  gcc_assert (SYMBOL_REF_P (symbol));
   gcc_assert (ix86_cmodel == CM_LARGE_PIC && !TARGET_PECOFF);
   gcc_assert (Pmode == DImode);
 
@@ -10279,7 +10279,7 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
   tree fndecl;
   bool call_no_callee_saved_registers = false;
 
-  if (GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF)
+  if (SYMBOL_REF_P (XEXP (fnaddr, 0)))
     {
       fndecl = SYMBOL_REF_DECL (XEXP (fnaddr, 0));
       if (fndecl)
@@ -10316,7 +10316,7 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
   if (TARGET_MACHO && !TARGET_64BIT)
     {
 #if TARGET_MACHO
-      if (flag_pic && GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF)
+      if (flag_pic && SYMBOL_REF_P (XEXP (fnaddr, 0)))
 	fnaddr = machopic_indirect_call_target (fnaddr);
 #endif
     }
@@ -10326,7 +10326,7 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
 	 check if PLT was explicitly avoided via no-plt or "noplt" attribute, making
 	 it an indirect call.  */
       if (flag_pic
-	  && GET_CODE (addr) == SYMBOL_REF
+	  && SYMBOL_REF_P (addr)
 	  && ix86_call_use_plt_p (addr))
 	{
 	  if (flag_plt
@@ -10400,7 +10400,7 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
   if (ix86_cmodel == CM_LARGE_PIC
       && !TARGET_PECOFF
       && MEM_P (fnaddr)
-      && GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF
+      && SYMBOL_REF_P (XEXP (fnaddr, 0))
       && !local_symbolic_operand (XEXP (fnaddr, 0), VOIDmode))
     fnaddr = gen_rtx_MEM (QImode, construct_plt_address (XEXP (fnaddr, 0)));
   /* Since x32 GOT slot is 64 bit with zero upper 32 bits, indirect
@@ -10503,7 +10503,7 @@ ix86_expand_call (rtx retval, rtx fnaddr, rtx callarg1,
     }
 
   if (TARGET_MACHO && TARGET_64BIT && !sibcall
-      && ((GET_CODE (addr) == SYMBOL_REF && !SYMBOL_REF_LOCAL_P (addr))
+      && ((SYMBOL_REF_P (addr) && !SYMBOL_REF_LOCAL_P (addr))
 	  || !fndecl || TREE_PUBLIC (fndecl)))
     {
       /* We allow public functions defined in a TU to bind locally for PIC
@@ -12612,7 +12612,7 @@ ix86_expand_args_builtin (const struct builtin_description *d,
 static rtx
 ix86_erase_embedded_rounding (rtx pat)
 {
-  if (GET_CODE (pat) == INSN)
+  if (NONJUMP_INSN_P (pat))
     pat = PATTERN (pat);
 
   gcc_assert (GET_CODE (pat) == SET);
@@ -25327,7 +25327,7 @@ const_vector_equal_evenodd_p (rtx op)
 {
   machine_mode mode = GET_MODE (op);
   int i, nunits = GET_MODE_NUNITS (mode);
-  if (GET_CODE (op) != CONST_VECTOR
+  if (!CONST_VECTOR_P (op)
       || nunits != CONST_VECTOR_NUNITS (op))
     return false;
   for (i = 0; i < nunits; i += 2)
@@ -25670,7 +25670,7 @@ ix86_notrack_prefixed_insn_p (rtx_insn *insn)
 
       /* Do not emit 'notrack' if it's not an indirect call.  */
       if (MEM_P (addr)
-	  && GET_CODE (XEXP (addr, 0)) == SYMBOL_REF)
+	  && SYMBOL_REF_P (XEXP (addr, 0)))
 	return false;
       else
 	return find_reg_note (insn, REG_CALL_NOCF_CHECK, 0);
@@ -26487,8 +26487,8 @@ do_mem_operand:
       if (rtx_equal_p (op, args[2]))
 	return 0xaa;
       /* Check if CONST_VECTOR is the ones-complement of args[2].  */
-      if (GET_CODE (op) == CONST_VECTOR
-	  && GET_CODE (args[2]) == CONST_VECTOR
+      if (CONST_VECTOR_P (op)
+	  && CONST_VECTOR_P (args[2])
 	  && rtx_equal_p (simplify_const_unary_operation (NOT, GET_MODE (op),
 							  op, GET_MODE (op)),
 			  args[2]))
@@ -26501,8 +26501,8 @@ do_mem_operand:
       if (rtx_equal_p (op, args[0]))
 	return 0xf0;
       /* Check if CONST_VECTOR is the ones-complement of args[0].  */
-      if (GET_CODE (op) == CONST_VECTOR
-	  && GET_CODE (args[0]) == CONST_VECTOR
+      if (CONST_VECTOR_P (op)
+	  && CONST_VECTOR_P (args[0])
 	  && rtx_equal_p (simplify_const_unary_operation (NOT, GET_MODE (op),
 							  op, GET_MODE (op)),
 			  args[0]))
@@ -26515,8 +26515,8 @@ do_mem_operand:
       if (rtx_equal_p (op, args[1]))
 	return 0xcc;
       /* Check if CONST_VECTOR is the ones-complement of args[1].  */
-      if (GET_CODE (op) == CONST_VECTOR
-	  && GET_CODE (args[1]) == CONST_VECTOR
+      if (CONST_VECTOR_P (op)
+	  && CONST_VECTOR_P (args[1])
 	  && rtx_equal_p (simplify_const_unary_operation (NOT, GET_MODE (op),
 							  op, GET_MODE (op)),
 			  args[1]))
@@ -26746,15 +26746,6 @@ ix86_expand_ternlog (machine_mode mode, rtx op0, rtx op1, rtx op2, int idx,
 	  && (!op2 || !side_effects_p (op2))
 	  && op0)
 	{
-	  if (GET_MODE (op0) != mode)
-	    op0 = gen_lowpart (mode, op0);
-	  if (!TARGET_64BIT && !register_operand (op0, mode))
-	    {
-	      /* Avoid force_reg (mode, op0).  */
-	      rtx reg = gen_reg_rtx (mode);
-	      emit_move_insn (reg, op0);
-	      op0 = reg;
-	    }
 	  emit_move_insn (target, gen_rtx_XOR (mode, op0, CONSTM1_RTX (mode)));
 	  return target;
 	}
@@ -26779,15 +26770,6 @@ ix86_expand_ternlog (machine_mode mode, rtx op0, rtx op1, rtx op2, int idx,
 	  && (!op2 || !side_effects_p (op2))
 	  && op1)
 	{
-	  if (GET_MODE (op1) != mode)
-	    op1 = gen_lowpart (mode, op1);
-	  if (!TARGET_64BIT && !register_operand (op1, mode))
-	    {
-	      /* Avoid force_reg (mode, op1).  */
-	      rtx reg = gen_reg_rtx (mode);
-	      emit_move_insn (reg, op1);
-	      op1 = reg;
-	    }
 	  emit_move_insn (target, gen_rtx_XOR (mode, op1, CONSTM1_RTX (mode)));
 	  return target;
 	}
@@ -26819,15 +26801,6 @@ ix86_expand_ternlog (machine_mode mode, rtx op0, rtx op1, rtx op2, int idx,
 	  && (!op1 || !side_effects_p (op1))
 	  && op2)
 	{
-	  if (GET_MODE (op2) != mode)
-	    op2 = gen_lowpart (mode, op2);
-	  if (!TARGET_64BIT && !register_operand (op2, mode))
-	    {
-	      /* Avoid force_reg (mode, op2).  */
-	      rtx reg = gen_reg_rtx (mode);
-	      emit_move_insn (reg, op2);
-	      op2 = reg;
-	    }
 	  emit_move_insn (target, gen_rtx_XOR (mode, op2, CONSTM1_RTX (mode)));
 	  return target;
 	}

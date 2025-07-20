@@ -1842,8 +1842,8 @@ typedef struct ix86_args {
 #define STRIP_UNARY(X) (UNARY_P (X) ? XEXP (X, 0) : X)
 
 #define SYMBOLIC_CONST(X)	\
-  (GET_CODE (X) == SYMBOL_REF						\
-   || GET_CODE (X) == LABEL_REF						\
+  (SYMBOL_REF_P (X)							\
+   || LABEL_REF_P (X)							\
    || (GET_CODE (X) == CONST && symbolic_reference_mentioned_p (X)))
 
 /* Max number of args passed in registers.  If this is more than 3, we will
@@ -2465,10 +2465,11 @@ constexpr wide_int_bitmask PTA_ARROWLAKE = PTA_ALDERLAKE | PTA_AVXIFMA
   | PTA_AVXVNNIINT8 | PTA_AVXNECONVERT | PTA_CMPCCXADD | PTA_UINTR;
 constexpr wide_int_bitmask PTA_ARROWLAKE_S = PTA_ARROWLAKE | PTA_AVXVNNIINT16
   | PTA_SHA512 | PTA_SM3 | PTA_SM4;
-constexpr wide_int_bitmask PTA_CLEARWATERFOREST = PTA_SIERRAFOREST
-  | PTA_AVXVNNIINT16 | PTA_SHA512 | PTA_SM3 | PTA_SM4 | PTA_USER_MSR
-  | PTA_PREFETCHI;
-constexpr wide_int_bitmask PTA_PANTHERLAKE = PTA_ARROWLAKE_S | PTA_PREFETCHI;
+constexpr wide_int_bitmask PTA_CLEARWATERFOREST =
+  (PTA_SIERRAFOREST & (~(PTA_KL | PTA_WIDEKL))) | PTA_AVXVNNIINT16 | PTA_SHA512
+  | PTA_SM3 | PTA_SM4 | PTA_USER_MSR | PTA_PREFETCHI;
+constexpr wide_int_bitmask PTA_PANTHERLAKE =
+  (PTA_ARROWLAKE_S & (~(PTA_KL | PTA_WIDEKL))) | PTA_PREFETCHI;
 constexpr wide_int_bitmask PTA_DIAMONDRAPIDS = PTA_GRANITERAPIDS_D
   | PTA_AVXIFMA | PTA_AVXNECONVERT | PTA_AVXVNNIINT16 | PTA_AVXVNNIINT8
   | PTA_CMPCCXADD | PTA_SHA512 | PTA_SM3 | PTA_SM4 | PTA_AVX10_2

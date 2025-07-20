@@ -5460,6 +5460,7 @@ vectorizable_conversion (vec_info *vinfo,
   vec<tree> vec_oprnds1 = vNULL;
   tree vop0;
   bb_vec_info bb_vinfo = dyn_cast <bb_vec_info> (vinfo);
+  loop_vec_info loop_vinfo = dyn_cast <loop_vec_info> (vinfo);
   int multi_step_cvt = 0;
   vec<tree> interm_types = vNULL;
   tree intermediate_type, cvt_type = NULL_TREE;
@@ -5800,6 +5801,20 @@ vectorizable_conversion (vec_info *vinfo,
 
     default:
       gcc_unreachable ();
+    }
+
+  if (modifier == WIDEN
+      && loop_vinfo
+      && LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo)
+      && (code1 == VEC_WIDEN_MULT_EVEN_EXPR
+	  || widening_evenodd_fn_p (code1)))
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "can't use a fully-masked loop because"
+			 " widening operation on even/odd elements"
+			 " mixes up lanes.\n");
+      LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo) = false;
     }
 
   if (!vec_stmt)		/* transformation not required.  */
@@ -6705,7 +6720,6 @@ vectorizable_operation (vec_info *vinfo,
   poly_uint64 nunits_in;
   poly_uint64 nunits_out;
   tree vectype_out;
-  int vec_num;
   int i;
   vec<tree> vec_oprnds0 = vNULL;
   vec<tree> vec_oprnds1 = vNULL;
@@ -6877,7 +6891,7 @@ vectorizable_operation (vec_info *vinfo,
 
   /* Multiple types in SLP are handled by creating the appropriate number of
      vectorized stmts for each SLP node.  */
-  vec_num = SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node);
+  auto vec_num = SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node);
 
   /* Reject attempts to combine mask types with nonmask types, e.g. if
      we have an AND between a (nonmask) boolean loaded from memory and
@@ -7229,7 +7243,7 @@ vectorizable_operation (vec_info *vinfo,
 	      && code == BIT_AND_EXPR
 	      && VECTOR_BOOLEAN_TYPE_P (vectype))
 	    {
-	      if (loop_vinfo->scalar_cond_masked_set.contains ({ op0, 1 }))
+	      if (loop_vinfo->scalar_cond_masked_set.contains ({ op0, vec_num }))
 		{
 		  mask = vect_get_loop_mask (loop_vinfo, gsi, masks,
 					     vec_num, vectype, i);
@@ -7238,7 +7252,7 @@ vectorizable_operation (vec_info *vinfo,
 					   vop0, gsi);
 		}
 
-	      if (loop_vinfo->scalar_cond_masked_set.contains ({ op1, 1 }))
+	      if (loop_vinfo->scalar_cond_masked_set.contains ({ op1, vec_num }))
 		{
 		  mask = vect_get_loop_mask (loop_vinfo, gsi, masks,
 					     vec_num, vectype, i);
@@ -13364,7 +13378,8 @@ vect_analyze_stmt (vec_info *vinfo,
       need extra handling, except for vectorizable reductions.  */
   if (!bb_vinfo
       && STMT_VINFO_TYPE (stmt_info) != reduc_vec_info_type
-      && STMT_VINFO_TYPE (stmt_info) != lc_phi_info_type
+      && (STMT_VINFO_TYPE (stmt_info) != lc_phi_info_type
+	  || STMT_VINFO_DEF_TYPE (stmt_info) == vect_internal_def)
       && (!node->ldst_lanes || SLP_TREE_CODE (node) == VEC_PERM_EXPR)
       && !can_vectorize_live_stmts (as_a <loop_vec_info> (vinfo),
 				    node, node_instance,

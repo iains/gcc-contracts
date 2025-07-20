@@ -1,3 +1,102 @@
+2025-07-16  Kwok Cheung Yeung  <kcyeung@baylibre.com>
+
+	* pt.cc (tsubst_omp_clause_decl): Use OMP_ITERATOR_DECL_P.
+	* semantics.cc (handle_omp_array_sections): Likewise.
+	(finish_omp_clauses): Likewise.
+
+2025-07-16  Alfie Richards  <alfie.richards@arm.com>
+
+	* class.cc (add_method): Remove argument.
+	* cp-tree.h (maybe_version_functions): Ditto.
+	* decl.cc (decls_match): Ditto.
+	(maybe_version_functions): Ditto.
+
+2025-07-16  Jeremy Rifkin  <jeremy@rifkin.dev>
+
+	PR c/82134
+	* call.cc (build_call_a): Add suppress_warning
+	* cp-gimplify.cc (cp_gimplify_expr): Add suppress_warning
+
+2025-07-15  Jason Merrill  <jason@redhat.com>
+
+	PR c++/44677
+	* cp-gimplify.cc (cp_fold) [CLEANUP_POINT_EXPR]: Don't force rvalue.
+	[COMPOUND_EXPR]: Likewise.
+	* cvt.cc (convert_to_void): Call mark_exp_read later.
+	* expr.cc (mark_use): Turn off read_p for any void argument.
+	(mark_exp_read): Return early for void argument.
+
+2025-07-15  Jason Merrill  <jason@redhat.com>
+
+	PR c++/120577
+	* constexpr.cc (cxx_eval_call_expression): Set
+	CONSTRUCTOR_NO_CLEARING on initial value for ctor.
+	(cxx_eval_component_reference): Make value-initialization
+	of an aggregate member explicit.
+
+2025-07-15  Jakub Jelinek  <jakub@redhat.com>
+	    Jason Merrill  <jason@redhat.com>
+
+	PR c/44677
+	* cp-gimplify.cc (cp_fold): Clear DECL_READ_P on lhs of MODIFY_EXPR
+	after cp_fold_rvalue if it wasn't set before.
+	* decl.cc (poplevel): Use OPT_Wunused_but_set_variable_
+	instead of OPT_Wunused_but_set_variable.
+	(finish_function): Use OPT_Wunused_but_set_parameter_
+	instead of OPT_Wunused_but_set_parameter.
+	* expr.cc (mark_use): Clear read_p for {PRE,POST}{IN,DE}CREMENT_EXPR
+	cast to void on {VAR,PARM}_DECL for
+	-Wunused-but-set-{parameter,variable}={2,3}.
+	(mark_exp_read): Handle {PRE,POST}{IN,DE}CREMENT_EXPR and don't handle
+	it when cast to void.
+	* module.cc (trees_in::fn_parms_fini): Remove unused but set variable
+	ix.
+	* semantics.cc (finish_unary_op_expr): Return early for
+	PRE{IN,DE}CREMENT_EXPR.
+	* typeck.cc (cp_build_unary_op): Clear DECL_READ_P
+	after mark_lvalue_use for -Wunused-but-set-{parameter,variable}={2,3}
+	on PRE{IN,DE}CREMENT_EXPR argument.
+	(cp_build_modify_expr): Clear DECL_READ_P after cp_build_binary_op
+	for -Wunused-but-set-{parameter,variable}=3.
+
+2025-07-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119064
+	* cp-tree.h: Implement C++26 P2786R13 - Trivial Relocatability.
+	(struct lang_type): Add trivially_relocatable,
+	trivially_relocatable_computed, replaceable and replaceable_computed
+	bitfields.  Change width of dummy from 2 to 30.
+	(CLASSTYPE_TRIVIALLY_RELOCATABLE_BIT,
+	CLASSTYPE_TRIVIALLY_RELOCATABLE_COMPUTED, CLASSTYPE_REPLACEABLE_BIT,
+	CLASSTYPE_REPLACEABLE_COMPUTED): Define.
+	(enum virt_specifier): Add VIRT_SPEC_TRIVIALLY_RELOCATABLE_IF_ELIGIBLE
+	and VIRT_SPEC_REPLACEABLE_IF_ELIGIBLE enumerators.
+	(trivially_relocatable_type_p, replaceable_type_p): Declare.
+	* cp-trait.def (IS_NOTHROW_RELOCATABLE, IS_REPLACEABLE,
+	IS_TRIVIALLY_RELOCATABLE): New traits.
+	* parser.cc (cp_parser_class_property_specifier_seq_opt): Handle
+	trivially_relocatable_if_eligible,
+	__trivially_relocatable_if_eligible, replaceable_if_eligible and
+	__replaceable_if_eligible.
+	(cp_parser_class_head): Set CLASSTYPE_REPLACEABLE_BIT
+	and/or CLASSTYPE_TRIVIALLY_RELOCATABLE_BIT if corresponding
+	conditional keywords were parsed and assert corresponding *_COMPUTED
+	macro is false.
+	* pt.cc (instantiate_class_template): Copy over also
+	CLASSTYPE_TRIVIALLY_RELOCATABLE_{BIT,COMPUTED} and
+	CLASSTYPE_REPLACEABLE_{BIT,COMPUTED} bits.
+	* semantics.cc (referenceable_type_p): Move definition earlier.
+	(trait_expr_value): Handle CPTK_IS_NOTHROW_RELOCATABLE,
+	CPTK_IS_REPLACEABLE and CPTK_IS_TRIVIALLY_RELOCATABLE.
+	(finish_trait_expr): Likewise.
+	* tree.cc (default_movable_type_p): New function.
+	(union_with_no_declared_special_member_fns): Likewise.
+	(trivially_relocatable_type_p): Likewise.
+	(replaceable_type_p): Likewise.
+	* constraint.cc (diagnose_trait_expr): Handle
+	CPTK_IS_NOTHROW_RELOCATABLE, CPTK_IS_REPLACEABLE and
+	CPTK_IS_TRIVIALLY_RELOCATABLE.
+
 2025-07-10  Jakub Jelinek  <jakub@redhat.com>
 
 	* cp-tree.h (struct lang_type): Add comment before key_method.

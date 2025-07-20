@@ -1,3 +1,1263 @@
+2025-07-18  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/autovec.md (avg<mode>3_ceil): Add new pattern
+	of avg3_ceil for RVV DImode
+
+2025-07-18  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/117423
+	* tree-sra.cc (analyze_access_subtree): Fix computation of grp_covered
+	flag.
+
+2025-07-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121126
+	* tree-vect-stmts.cc (vect_analyze_stmt): Analyze the
+	live lane extract for LC PHIs that are vect_internal_def.
+
+2025-07-18  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop.cc (vectorizable_live_operation_1):
+	Remove stmt_info and ncopies parameters.  Remove !slp_node
+	paths.
+	(vectorizable_live_operation): Remove !slp_node paths.
+
+2025-07-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120924
+	* params.opt (uninit-max-chain-len): Up from 8 to 12.
+
+2025-07-18  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121048
+	* tree-vect-loop.cc (vect_determine_vectype_for_stmt_1):
+	Remove rejecting vector(1) vector types.
+	(vect_set_stmts_vectype): Likewise.
+	* tree-vect-slp.cc (vect_make_slp_decision): Only
+	count instances with non-vector(1) root towards whether
+	we have any interesting instances to vectorize.
+
+2025-07-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/121131
+	* gimple-fold.cc (fold_nonarray_ctor_reference): Use
+	TREE_INT_CST_LOW (TYPE_SIZE ()) instead of
+	GET_MODE_BITSIZE (SCALAR_INT_TYPE_MODE ()) for BLKmode BITINT_TYPEs.
+	Don't compute encoding_size at all for little endian targets.
+
+2025-07-17  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR middle-end/121095
+	* gcse.cc (execute_hardreg_pre): Skip if the hardreg which is never live.
+
+2025-07-17  Filip Kastl  <fkastl@suse.cz>
+
+	* tree-ssa-structalias.cc (lookup_vi_for_tree): Fix GNU style.
+	(process_constraint): Fix GNU style.
+	(get_constraint_for_component_ref): Fix GNU style.
+	(get_constraint_for_1): Fix GNU style.
+	(get_function_part_constraint): Fix GNU style.
+	(handle_lhs_call): Fix GNU style.
+	(find_func_aliases_for_builtin_call): Fix GNU style.
+	(find_func_aliases): Fix GNU style.
+	(find_func_clobbers): Fix GNU style.
+	(struct shared_bitmap_hasher): Fix GNU style.
+	(shared_bitmap_hasher::hash): Fix GNU style.
+	(pt_solution_includes_global): Fix GNU style.
+	(init_base_vars): Fix GNU style.
+	(visit_loadstore): Fix GNU style.
+	(compute_dependence_clique): Fix GNU style.
+	(struct pt_solution): Fix GNU style.
+	(ipa_pta_execute): Fix GNU style.
+
+2025-07-17  Filip Kastl  <fkastl@suse.cz>
+
+	* pta-andersen.cc (struct constraint_graph): Fix GNU style.
+	(constraint_equal): Fix GNU style.
+	(set_union_with_increment): Fix GNU style.
+	(insert_into_complex): Fix GNU style.
+	(merge_node_constraints): Fix GNU style.
+	(unify_nodes): Fix GNU style.
+	(do_ds_constraint): Fix GNU style.
+	(scc_info::scc_info): Fix GNU style.
+	(find_indirect_cycles): Fix GNU style.
+	(equiv_class_lookup_or_add): Fix GNU style.
+	(label_visit): Fix GNU style.
+	(dump_pred_graph): Fix GNU style.
+	(perform_var_substitution): Fix GNU style.
+	(eliminate_indirect_cycles): Fix GNU style.
+	(solve_graph): Fix GNU style.
+	(solve_constraints): Fix GNU style.
+	* tree-ssa-structalias.cc (first_vi_for_offset): Fix GNU style.
+	(debug_constraint): Fix GNU style.
+	* tree-ssa-structalias.h (struct constraint_expr): Fix GNU
+	style.
+	(struct variable_info): Fix GNU style.
+
+2025-07-17  H.J. Lu  <hjl.tools@gmail.com>
+
+	* config/i386/i386-expand.cc (ix86_expand_ternlog): Don't change
+	mode for XOR.
+
+2025-07-17  Filip Kastl  <fkastl@suse.cz>
+
+	* Makefile.in: Add pta-andersen.o.
+	* tree-ssa-structalias.cc (create_variable_info_for): Just move
+	around.
+	(unify_nodes): Move to pta-andersen.cc.
+	(struct constraint): Move to tree-ssa-structalias.h.
+	(EXECUTE_IF_IN_NONNULL_BITMAP): Move to pta-andersen.cc.
+	(struct variable_info): Move to tree-ssa-structalias.h.
+	(struct constraint_stats): Move to tree-ssa-structalias.h.
+	(first_vi_for_offset): External linkage, move to namespace
+	pointer_analysis.
+	(first_or_preceding_vi_for_offset): External linkage, move to namespace
+	pointer_analysis.
+	(dump_constraint): External linkage, move to namespace
+	pointer_analysis.
+	(debug_constraint): External linkage, move to namespace
+	pointer_analysis.
+	(dump_constraints): External linkage, move to namespace
+	pointer_analysis.
+	(debug_constraints): External linkage, move to namespace
+	pointer_analysis.
+	(lookup_vi_for_tree): Move around inside tree-ssa-structalias.cc.
+	(type_can_have_subvars): Move around inside tree-ssa-structalias.cc.
+	(make_param_constraints): Move around inside tree-ssa-structalias.cc.
+	(dump_solution_for_var): External linkage, move to namespace
+	pointer_analysis.  find (...) -> var_rep[...].
+	(get_varinfo): Move to tree-ssa-structalias.h.
+	(debug_solution_for_var): External linkage, move to namespace
+	pointer_analysis.
+	(vi_next): Move to tree-ssa-structalias.h.
+	(dump_sa_stats): External linkage, move to namespace pointer_analysis.
+	(new_var_info): Just move around.
+	(dump_sa_points_to_info): External linkage, move to namespace
+	pointer_analysis.
+	(debug_sa_points_to_info): External linkage, move to namespace
+	pointer_analysis.
+	(get_call_vi): Just move around.
+	(dump_varinfo): External linkage, move to namespace pointer_analysis.
+	(lookup_call_use_vi): Just move around.
+	(lookup_call_clobber_vi): Just move around.
+	(get_call_use_vi): Just move around.
+	(get_call_clobber_vi): Just move around.
+	(enum constraint_expr_type): Move to tree-ssa-structalias.h.
+	(struct constraint_expr): Move to tree-ssa-structalias.h.
+	(UNKNOWN_OFFSET): Move to tree-ssa-structalias.h.
+	(get_constraint_for_1): Just move around.
+	(get_constraint_for): Just move around.
+	(get_constraint_for_rhs): Just move around.
+	(do_deref): Just move around.
+	(constraint_pool): Just move around.
+	(struct constraint_graph): Move to pta-andersen.h.
+	(FIRST_REF_NODE): Move to pta-andersen.cc.
+	(LAST_REF_NODE): Move to pta-andersen.cc.
+	(find): Move to pta-andersen.cc.
+	(unite): Move to pta-andersen.cc.
+	(new_constraint): Just move around.
+	(debug_constraint_graph): External linkage, move to namespace
+	pointer_analysis.
+	(debug_varinfo): External linkage, move to namespace pointer_analysis.
+	(debug_varmap): External linkage, move to namespace pointer_analysis.
+	(dump_constraint_graph): External linkage, move to namespace
+	pointer_analysis.
+	(constraint_expr_equal): Move to pta-andersen.cc.
+	(constraint_expr_less): Move to pta-andersen.cc.
+	(constraint_less): Move to pta-andersen.cc.
+	(constraint_equal): Move to pta-andersen.cc.
+	(constraint_vec_find): Move to pta-andersen.cc.
+	(constraint_set_union): Move to pta-andersen.cc.
+	(solution_set_expand): Move to pta-andersen.cc.
+	(set_union_with_increment): Move to pta-andersen.cc.
+	(insert_into_complex): Move to pta-andersen.cc.
+	(merge_node_constraints): Move to pta-andersen.cc.
+	(clear_edges_for_node): Move to pta-andersen.cc.
+	(merge_graph_nodes): Move to pta-andersen.cc.
+	(add_implicit_graph_edge): Move to pta-andersen.cc.
+	(add_pred_graph_edge): Move to pta-andersen.cc.
+	(add_graph_edge): Move to pta-andersen.cc.
+	(init_graph): Move to pta-andersen.cc.  Initialize
+	predbitmap_obstack here.
+	(build_pred_graph): Move to pta-andersen.cc.
+	(build_succ_graph): Move to pta-andersen.cc.
+	(class scc_info): Move to pta-andersen.cc.
+	(scc_visit): Move to pta-andersen.cc.
+	(solve_add_graph_edge): Move to pta-andersen.cc.
+	(do_sd_constraint): Move to pta-andersen.cc.
+	(do_ds_constraint): Move to pta-andersen.cc.
+	(do_complex_constraint): Move to pta-andersen.cc.
+	(scc_info::scc_info): Move to pta-andersen.cc.
+	(scc_info::~scc_info): Move to pta-andersen.cc.
+	(find_indirect_cycles): Move to pta-andersen.cc.
+	(topo_visit): Move to pta-andersen.cc.
+	(compute_topo_order): Move to pta-andersen.cc.
+	(struct equiv_class_hasher): Move to pta-andersen.cc.
+	(equiv_class_hasher::hash): Move to pta-andersen.cc.
+	(equiv_class_hasher::equal): Move to pta-andersen.cc.
+	(equiv_class_lookup_or_add): Move to pta-andersen.cc.
+	(condense_visit): Move to pta-andersen.cc.
+	(label_visit): Move to pta-andersen.cc.
+	(dump_pred_graph): External linkage, move to namespace
+	pointer_analysis.
+	(dump_varmap): External linkage, move to namespace pointer_analysis.
+	(perform_var_substitution): Move to pta-andersen.cc.
+	(free_var_substitution_info): Move to pta-andersen.cc.
+	(find_equivalent_node): Move to pta-andersen.cc.
+	(unite_pointer_equivalences): Move to pta-andersen.cc.
+	(move_complex_constraints): Move to pta-andersen.cc.
+	(rewrite_constraints): Move to pta-andersen.cc.
+	(eliminate_indirect_cycles): Move to pta-andersen.cc.
+	(solve_graph): Move to pta-andersen.cc.
+	(set_uids_in_ptset): find (...) -> var_rep[...].
+	(find_what_var_points_to): find (...) -> var_rep[...].
+	(init_alias_vars): Don't initialize predbitmap_obstack here.
+	(remove_preds_and_fake_succs): Move to pta-andersen.cc.
+	(solve_constraints): Move to pta-andersen.cc.  Call
+	delete_graph() at the end.
+	(delete_points_to_sets): Don't delete graph here.  Delete var_rep here.
+	(visit_loadstore): find (...) -> var_rep[...].
+	(compute_dependence_clique): find (...) -> var_rep[...].
+	(ipa_pta_execute): find (...) -> var_rep[...].
+	* pta-andersen.cc: New file.
+	* pta-andersen.h: New file.
+	* tree-ssa-structalias.h: New file.
+
+2025-07-17  Richard Sandiford  <richard.sandiford@arm.com>
+	    Yury Khrustalev  <yury.khrustalev@arm.com>
+
+	* doc/sourcebuild.texi (aarch64_sme_hw): Document.
+
+2025-07-17  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* config/s390/s390.md (signbit_tdc): Rename expander.
+	(signbit<mode>2): New expander.
+	(signbit<mode>2_z10): New expander.
+
+2025-07-17  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* config/s390/s390.cc (s390_register_move_cost): Add costing for
+	vlvg/vlgv.
+
+2025-07-17  Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	* config/s390/vector.md (bhfgq): Add scalar modes.
+	(*movdi<mode>_zero_extend_A): New insn.
+	(*movsi<mode>_zero_extend_A): New insn.
+	(*movdi<mode>_zero_extend_B): New insn.
+	(*movsi<mode>_zero_extend_B): New insn.
+
+2025-07-17  Xi Ruoyao  <xry111@xry111.site>
+
+	PR target/121064
+	* config/loongarch/lsx.md (lsx_vshuf_<lsxfmt_f>): Add '@' to
+	generate a mode-aware helper.  Use <VIMODE> as the mode of the
+	operand 1 (selector).
+	* config/loongarch/lasx.md (lasx_xvshuf_<lasxfmt_f>): Likewise.
+	* config/loongarch/loongarch.cc
+	(loongarch_try_expand_lsx_vshuf_const): Create a new pseudo for
+	the selector.  Use the mode-aware helper to simplify the code.
+	(loongarch_expand_vec_perm_const): Likewise.
+
+2025-07-17  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-slp.cc (vect_build_slp_tree_1): Reject
+	single-lane vector types.
+
+2025-07-17  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121035
+	* tree-ssa-pre.cc (find_or_generate_expression): Handle
+	values without expression.
+
+2025-07-16  David Malcolm  <dmalcolm@redhat.com>
+
+	* diagnostic-state-to-dot.cc (state_diagram::m_show_tags): Drop
+	unused field.
+
+2025-07-16  Kwok Cheung Yeung  <kcyeung@baylibre.com>
+
+	* gimplify.cc (gimplify_omp_affinity): Use OMP_ITERATOR_DECL_P.
+	(compute_omp_iterator_count): New.
+	(build_omp_iterator_loop): New.
+	(gimplify_omp_depend): Use OMP_ITERATOR_DECL_P,
+	compute_omp_iterator_count and build_omp_iterator_loop.
+	* tree-inline.cc (copy_tree_body_r): Use OMP_ITERATOR_DECL_P.
+	* tree-pretty-print.cc (dump_omp_clause): Likewise.
+	* tree.h (OMP_ITERATOR_DECL_P): New macro.
+
+2025-07-16  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/121062
+	* config/i386/i386.cc (ix86_convert_const_vector_to_integer):
+	Handle E_V1SImode and E_V1DImode.
+	* config/i386/mmx.md (V_16_32_64): Add V1SI, V2BF and V1DI.
+	(mmxinsnmode): Add V1DI and V1SI.
+	Add V_16_32_64 splitter for constant vector loads from constant
+	vector pool.
+	(V_16_32_64:*mov<mode>_imm): Moved after V_16_32_64 splitter.
+	Replace lowpart_subreg with adjust_address.
+
+2025-07-16  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/120881
+	PR testsuite/121078
+	* config/i386/i386-options.cc (ix86_option_override_internal):
+	Warn -pg without -mfentry only on glibc targets.
+
+2025-07-16  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386-expand.cc (ix86_expand_move):
+	Use MEM_P predicate instead of open coding it.
+	(ix86_erase_embedded_rounding):
+	Use NONJUMP_INSN_P predicate instead of open coding it.
+	* config/i386/i386-features.cc (convertible_comparison_p):
+	Use REG_P predicate instead of open coding it.
+	* config/i386/i386.cc (ix86_rtx_costs):
+	Use SUBREG_P predicate instead of open coding it.
+
+2025-07-16  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386.cc (symbolic_reference_mentioned_p):
+	Use LABEL_REF_P predicate instead of open coding it.
+	(ix86_legitimate_constant_p): Ditto.
+	(legitimate_pic_address_disp_p): Ditto.
+	(ix86_legitimate_address_p): Ditto.
+	(legitimize_pic_address): Ditto.
+	(ix86_print_operand): Ditto.
+	(ix86_print_operand_address_as): Ditto.
+	(ix86_rip_relative_addr_p): Ditto.
+	* config/i386/i386.h (SYMBOLIC_CONST): Ditto.
+	* config/i386/i386.md (*anddi_1 to *andsi_1_zext splitter): Ditto.
+	* config/i386/predicates.md (symbolic_operand): Ditto.
+	(local_symbolic_operand): Ditto.
+	(vsib_address_operand): Ditto.
+
+2025-07-16  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386-expand.cc (ix86_expand_move):
+	Use SYMBOL_REF_P predicate instead of open coding it.
+	(ix86_split_long_move): Ditto.
+	(construct_plt_address): Ditto.
+	(ix86_expand_call): Ditto.
+	(ix86_notrack_prefixed_insn_p): Ditto.
+	* config/i386/i386-features.cc
+	(rest_of_insert_endbr_and_patchable_area): Ditto.
+	* config/i386/i386.cc (symbolic_reference_mentioned_p): Ditto.
+	(ix86_force_load_from_GOT_p): Ditto.
+	(ix86_legitimate_constant_p): Ditto.
+	(legitimate_pic_operand_p): Ditto.
+	(legitimate_pic_address_disp_p): Ditto.
+	(ix86_legitimate_address_p): Ditto.
+	(legitimize_pic_address): Ditto.
+	(ix86_legitimize_address): Ditto.
+	(ix86_delegitimize_tls_address): Ditto.
+	(ix86_print_operand): Ditto.
+	(ix86_print_operand_address_as): Ditto.
+	(ix86_rip_relative_addr_p): Ditto.
+	(symbolic_base_address_p): Ditto.
+	* config/i386/i386.h (SYMBOLIC_CONST): Ditto.
+	* config/i386/i386.md (*anddi_1 to *andsi_1_zext splitter): Ditto.
+	* config/i386/predicates.md (symbolic_operand): Ditto.
+	(local_symbolic_operand): Ditto.
+	(local_func_symbolic_operand): Ditto.
+
+2025-07-16  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/i386-expand.cc (ix86_expand_vector_logical_operator):
+	Use CONST_VECTOR_P instead of open coding it.
+	(ix86_expand_int_sse_cmp): Ditto.
+	(ix86_extract_perm_from_pool_constant): Ditto.
+	(ix86_split_to_parts): Ditto.
+	(const_vector_equal_evenodd_p): Ditto.
+	* config/i386/i386.cc (ix86_print_operand): Ditto.
+	* config/i386/predicates.md (zero_extended_scalar_load_operand): Ditto.
+	(float_vector_all_ones_operand): Ditto.
+	* config/i386/sse.md (avx512vl_vextractf128<mode>): Ditto.
+
+2025-07-16  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121049
+	* internal-fn.h (widening_evenodd_fn_p): Declare.
+	* internal-fn.cc (widening_evenodd_fn_p): New function.
+	* tree-vect-stmts.cc (vectorizable_conversion): When using
+	an even/odd widening function disable loop masking.
+
+2025-07-16  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/119920
+	PR tree-optimization/112324
+	PR tree-optimization/110015
+	* tree-if-conv.cc (find_different_opnum): New function.
+	(factor_out_operators): New function.
+	(predicate_scalar_phi): Call factor_out_operators when
+	there is only 2 elements of a phi.
+
+2025-07-16  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* tree-if-conv.cc (fold_build_cond_expr): Return early if lhs and rhs
+	are the same.
+
+2025-07-16  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	* tree-if-conv.cc (combine_blocks): Remove predicated
+	dynamic array.
+
+2025-07-16  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121116
+	* tree-vect-loop.cc (vectorizable_induction): Use the
+	step vector element type for further processing.
+
+2025-07-16  Andrew Stubbs  <ams@baylibre.com>
+
+	* config/gcn/gcn-valu.md (add<mode>3_vcc_dup<exec_vcc>): Change
+	operand 2 to allow gcn_alu_operand.  Swap the operands in the VCC
+	update RTL.
+	(add<mode>3_vcc_zext_dup): Likewise.
+	(add<mode>3_vcc_zext_dup_exec): Likewise.
+	(add<mode>3_vcc_zext_dup2): Likewise.
+	(add<mode>3_vcc_zext_dup2_exec): Likewise.
+
+2025-07-16  Spencer Abson  <spencer.abson@arm.com>
+
+	PR target/117850
+	* config/aarch64/aarch64-builtins.cc (LO_HI_PAIRINGS): New, group the
+	lo/hi pairs from aarch64-builtin-pairs.def.
+	(aarch64_get_highpart_builtin): New function.
+	(aarch64_v128_highpart_ref): New function, helper to look for vector
+	highparts.
+	(aarch64_build_vector_cst): New function, helper to build duplicated
+	VECTOR_CSTs.
+	(aarch64_fold_lo_call_to_hi): New function.
+	(aarch64_general_gimple_fold_builtin): Add cases for the lo builtins
+	in aarch64-builtin-pairs.def.
+	* config/aarch64/aarch64-builtin-pairs.def: New file, declare the
+	parirs of lowpart-operating and highpart-operating builtins.
+
+2025-07-16  Alfie Richards  <alfie.richards@arm.com>
+
+	* tree.cc (get_clone_versions): New function.
+	(get_clone_attr_versions): New function.
+	(get_version): New function.
+	* tree.h (get_clone_versions): New function.
+	(get_clone_attr_versions): New function.
+	(get_target_version): New function.
+
+2025-07-16  Alfie Richards  <alfie.richards@arm.com>
+
+	* attribs.cc (make_attribute): Change arguments.
+	* attribs.h (make_attribute): Change arguments.
+
+2025-07-16  Alfie Richards  <alfie.richards@arm.com>
+
+	* pretty-print.cc (format_phase_2): Add support for string_slice.
+	* vec.cc (string_slice::tokenize): New static method.
+	(string_slice::strcmp): New static method.
+	(string_slice::strip): New method.
+	(test_string_slice_initializers): New test.
+	(test_string_slice_tokenize): Ditto.
+	(test_string_slice_strcmp): Ditto.
+	(test_string_slice_equality): Ditto.
+	(test_string_slice_inequality): Ditto.
+	(test_string_slice_invalid): Ditto.
+	(test_string_slice_strip): Ditto.
+	(vec_cc_tests): Add new tests.
+	* vec.h (class string_slice): New class.
+
+2025-07-16  Robin Dapp  <rdapp@ventanamicro.com>
+
+	PR middle-end/121065
+	* cfgexpand.cc (expand_debug_expr): Allow fixed-point modes for
+	RDIV_EXPR.
+	* optabs-tree.cc (optab_for_tree_code): Ditto.
+
+2025-07-16  Robin Dapp  <rdapp@ventanamicro.com>
+
+	PR target/120297
+	* config/riscv/riscv-vsetvl.def: Do not forget ratio demand of
+	previous vsetvl.
+
+2025-07-16  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* config/aarch64/aarch64-sve2.md (*aarch64_sve2_bsl2n_eon<mode>):
+	New pattern.
+	(*aarch64_sve2_eon_bsl2n_unpred<mode>): Likewise.
+
+2025-07-16  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* config/aarch64/aarch64-sve2.md (*aarch64_sve2_unpred_nor<mode>):
+	New define_insn.
+	(*aarch64_sve2_nand_unpred<mode>): Likewise.
+
+2025-07-16  Jeremy Rifkin  <jeremy@rifkin.dev>
+
+	PR c/82134
+	* gimplify.cc (gimplify_modify_expr): Add suppress_warning
+	* tree-cfg.cc (do_warn_unused_result): Check warning_suppressed_p
+
+2025-07-16  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* common/config/i386/i386-common.cc
+	(OPTION_MASK_ISA2_AMX_AVX512_SET): Do not set AVX10.2.
+	(OPTION_MASK_ISA2_AVX10_2_UNSET): Remove AMX-AVX512 unset.
+	(OPTION_MASK_ISA2_AVX512F_UNSET): Unset AMX-AVX512.
+	(ix86_handle_option): Imply AVX512F for AMX-AVX512.
+
+2025-07-16  Pan Li  <pan2.li@intel.com>
+
+	* config/riscv/autovec.md (avg<mode>3_floor): Add new
+	pattern of avg3_floor for rvv DImode.
+
+2025-07-15  David Malcolm  <dmalcolm@redhat.com>
+
+	* spellcheck.cc: Define INCLUDE_ALGORITHM.
+	(CASE_COST, BASE_COST): Convert to...
+	(case_cost, base_cost): ...these, in an anonymous namespace.
+	(get_edit_distance): Update for above.  Use std::min rather than
+	MIN.
+	(get_edit_distance_cutoff): Likewise.  Use std::max rather than
+	MAX.
+	(selftest::test_edit_distances): Update for BASE_COST renaming.
+	(selftest::get_old_cutoff): Likewise.  Use std::max.
+	(selftest::assert_not_suggested_for): Use nullptr.
+	(selftest::test_find_closest_string): Likewise.
+	* spellcheck.h: Replace TYPE with StringLikeType in templates,
+	and use CamelCase.
+
+2025-07-15  David Malcolm  <dmalcolm@redhat.com>
+
+	PR sarif-replay/120792
+	* auto-obstack.h: New file, based on material taken from
+	pretty-print.cc.
+	* diagnostic-digraphs.h
+	(diagnostics::digraphs::digraph::set_description): New.
+	(diagnostics::digraphs::node::set_label): New.
+	* doc/libgdiagnostics/topics/compatibility.rst: Add
+	LIBGDIAGNOSTICS_ABI_4.
+	* doc/libgdiagnostics/topics/diagnostics.rst
+	(diagnostic_finish_via_msg_buf): Document new entrypoint.
+	* doc/libgdiagnostics/topics/execution-paths.rst
+	(diagnostic_execution_path_add_event_via_msg_buf): Document new
+	entrypoint.
+	* doc/libgdiagnostics/topics/index.rst: Add message-buffers.rst.
+	* doc/libgdiagnostics/topics/message-buffers.rst: New file.
+	* doc/libgdiagnostics/topics/message-formatting.rst: Add note
+	about message buffers.
+	* doc/libgdiagnostics/topics/physical-locations.rst
+	(diagnostic_add_location_with_label_via_msg_buf): Add.
+	* doc/libgdiagnostics/tutorial/07-execution-paths.rst: Link to
+	next section.
+	* doc/libgdiagnostics/tutorial/08-message-buffers.rst: New file.
+	* doc/libgdiagnostics/tutorial/index.rst: Add
+	08-message-buffers.rst.
+	* libgdiagnostics++.h (libgdiagnostics::message_buffer): New
+	class.
+	(libgdiagnostics::execution_path::add_event_via_msg_buf): New.
+	(libgdiagnostics::diagnostic::add_location_with_label): New.
+	(libgdiagnostics::diagnostic::finish_via_msg_buf): New.
+	(libgdiagnostics::graph::set_description): New overload.
+	(libgdiagnostics::graph::add_edge): New overload.
+	(libgdiagnostics::node::set_label): New overload.
+	* libgdiagnostics-private.h
+	(private_diagnostic_execution_path_add_event_2): Drop decl.
+	(private_diagnostic_execution_path_add_event_3): New decl.
+	* libgdiagnostics.cc:  Include "pretty-print-format-impl.h",
+	"pretty-print-markup.h", and "auto-obstack.h".
+	(class copying_token_printer): New.
+	(struct diagnostic_message_buffer): New.
+	(class pp_element_message_buffer): New.
+	(libgdiagnostics_path_event::libgdiagnostics_path_event): Replace
+	params "gmsgid" and "args" with "msg_buf".
+	(libgdiagnostics_path_event::print_desc): Reimplement using
+	pp_element_message_buffer to replay m_msg_buf into "pp".
+	(libgdiagnostics_path_event::m_desc_uncolored): Drop field.
+	(libgdiagnostics_path_event::m_desc_colored): Drop field.
+	(libgdiagnostics_path_event::msg_buf): New field.
+	(diagnostic_execution_path::add_event_va): Reimplement.
+	(diagnostic_execution_path::add_event_via_msg_buf): New.
+	(diagnostic::add_location_with_label): New overload, using
+	msg_buf.
+	(diagnostic_manager::emit): Reimplement with...
+	(diagnostic_manager::emit_va): ...this.
+	(diagnostic_manager::emit_msg_buf): New.
+	(FAIL_IF_NULL): Rename "p" to "ptr_arg".
+	(diagnostic_finish_va): Update to use diagnostic_manager::emit_va.
+	(diagnostic_graph::add_node_with_id): Rename "id" to "node_id".
+	(diagnostic_graph_add_node): Likewise.
+	(diagnostic_graph_add_edge): Rename "id" to "edge_id".
+	(diagnostic_graph_get_node_by_id): Rename "id" to "node_id".
+	(diagnostic_graph_get_edge_by_id): Rename "id" to "edge_id".
+	(private_diagnostic_execution_path_add_event_2): Delete.
+	(diagnostic_message_buffer_new): New public entrypoint.
+	(diagnostic_message_buffer_release): Likewise.
+	(diagnostic_message_buffer_append_str): Likewise.
+	(diagnostic_message_buffer_append_text): Likewise.
+	(diagnostic_message_buffer_append_byte): Likewise.
+	(diagnostic_message_buffer_append_printf): Likewise.
+	(diagnostic_message_buffer_append_event_id): Likewise.
+	(diagnostic_message_buffer_begin_url): Likewise.
+	(diagnostic_message_buffer_end_url): Likewise.
+	(diagnostic_message_buffer_begin_quote): Likewise.
+	(diagnostic_message_buffer_end_quote): Likewise.
+	(diagnostic_message_buffer_begin_color): Likewise.
+	(diagnostic_message_buffer_end_color): Likewise.
+	(diagnostic_message_buffer_dump): Likewise.
+	(diagnostic_finish_via_msg_buf): Likewise.
+	(diagnostic_add_location_with_label_via_msg_buf): Likewise.
+	(diagnostic_execution_path_add_event_via_msg_buf): Likewise.
+	(diagnostic_graph_set_description_via_msg_buf): Likewise.
+	(diagnostic_graph_add_edge_via_msg_buf): Likewise.
+	(diagnostic_node_set_label_via_msg_buf): Likewise.
+	(private_diagnostic_execution_path_add_event_3): New private
+	entrypoint.
+	* libgdiagnostics.h (LIBGDIAGNOSTICS_PARAM_FORMAT_STRING): New macro.
+	(LIBGDIAGNOSTICS_PARAM_PRINTF_FORMAT_STRING): New macro.
+	(diagnostic_message_buffer): New typedef.
+	(LIBDIAGNOSTICS_HAVE_diagnostic_message_buffer): New define.
+	(diagnostic_message_buffer_new): New decl.
+	(diagnostic_message_buffer_release): New decl.
+	(diagnostic_message_buffer_append_str): New decl.
+	(diagnostic_message_buffer_append_text): New decl.
+	(diagnostic_message_buffer_append_byte): New decl.
+	(diagnostic_message_buffer_append_printf): New decl.
+	(diagnostic_message_buffer_append_event_id): New decl.
+	(diagnostic_message_buffer_begin_url): New decl.
+	(diagnostic_message_buffer_end_url): New decl.
+	(diagnostic_message_buffer_begin_quote): New decl.
+	(diagnostic_message_buffer_end_quote): New decl.
+	(diagnostic_message_buffer_begin_color): New decl.
+	(diagnostic_message_buffer_end_color): New decl.
+	(diagnostic_message_buffer_dump): New decl.
+	(diagnostic_finish_via_msg_buf): New decl.
+	(diagnostic_add_location_with_label_via_msg_buf): New decl.
+	(diagnostic_execution_path_add_event_via_msg_buf): New decl.
+	(diagnostic_graph_set_description_via_msg_buf): New decl.
+	(diagnostic_graph_add_edge_via_msg_buf): New decl.
+	(diagnostic_node_set_label_via_msg_buf): New decl.
+	* libgdiagnostics.map (LIBGDIAGNOSTICS_ABI_3): Drop
+	private_diagnostic_execution_path_add_event_2.
+	(LIBGDIAGNOSTICS_ABI_4): New.
+	* libsarifreplay.cc (class annotation): Use
+	libgdiagnostics::message_buffer rather than label_text.
+	(add_any_annotations): Likewise.
+	(sarif_replayer::handle_result_obj): Likewise.
+	(make_plain_text_within_result_message): Likewise.
+	(handle_thread_flow_location_object): Likewise.
+	(handle_location_object): Likewise.
+	(sarif_replayer::handle_graph_object): Likewise.
+	(sarif_replayer::handle_node_object): Likewise.
+	(sarif_replayer::handle_edge_object): Likewise.
+	* pretty-print-format-impl.h (pp_token_list::push_back_byte): New
+	decl.
+	* pretty-print-markup.h (pp_markup::context::begin_url): New decl.
+	(pp_markup::context::end_url): New decl.
+	(pp_markup::context::add_event_id): New decl.
+	* pretty-print.cc: Include "auto-obstack.h".
+	(pp_token_list::push_back_byte): New.
+	(struct auto_obstack): Move to auto-obstack.h.
+	(default_token_printer): Make non-static.
+	(pp_markup::context::begin_url): New.
+	(pp_markup::context::end_url): New.
+	(pp_markup::context::add_event_id): New.
+
+2025-07-15  Umesh Kalappa  <ukalappa.mips@gmail.com>
+
+	* config/riscv/riscv-cores.def (RISCV_CORE): Updated the supported march.
+	* config/riscv/riscv-ext-mips.def (DEFINE_RISCV_EXT):
+	New file added for mips conditional mov extension.
+	* config/riscv/riscv-ext.def: Likewise.
+	* config/riscv/t-riscv: Generates riscv-ext.opt
+	* config/riscv/riscv-ext.opt: Generated file.
+	* config/riscv/riscv.cc (riscv_expand_conditional_move): Updated for mips cmov
+	and outlined some code that handle arch cond move.
+	* config/riscv/riscv.md (mov<mode>cc): updated expand for MIPS CCMOV.
+	* config/riscv/mips-insn.md: New file for mips-p8700 ccmov insn.
+	* doc/riscv-ext.texi: Updated for mips cmov.
+
+2025-07-15  Konstantinos Eleftheriou  <konstantinos.eleftheriou@vrull.eu>
+
+	* avoid-store-forwarding.cc (generate_bit_insert_sequence):
+	Remove adjustment of bitfield insertion's starting position
+	when BYTES_BIG_ENDIAN != BITS_BIG_ENDIAN.
+	(process_store_forwarding): Update offset check in base reg
+	initialization to take into account the target's endianness.
+
+2025-07-15  Soumya AR  <soumyaa@nvidia.com>
+
+	* config/aarch64/aarch64-tuning-flags.def (AARCH64_EXTRA_TUNING_OPTION):
+	Add AVOID_LDAPUR tuning flag.
+	* config/aarch64/aarch64.cc (aarch64_adjust_generic_arch_tuning):
+	Set AVOID_LDAPUR for architectures before armv8.8-a.
+	(aarch64_override_options_internal): Apply generic tuning adjustments
+	to generic_armv8_a_tunings and generic_armv9_a_tunings.
+	* config/aarch64/aarch64.h (TARGET_ENABLE_LDAPUR): New macro to
+	control LDAPUR usage based on RCPC2 and tuning flags.
+	* config/aarch64/aarch64.md: Add enable_ldapur attribute.
+	* config/aarch64/atomics.md (aarch64_atomic_load<mode>_rcpc): Modify
+	to emit LDAPUR for cores with RCPC2.
+	(*aarch64_atomic_load<ALLX:mode>_rcpc_zext): Likewise.
+	(*aarch64_atomic_load<ALLX:mode>_rcpc_sext): Update constraint to Ust.
+	* config/aarch64/tuning_models/cortexx925.h: Add AVOID_LDAPUR flag.
+	* config/aarch64/tuning_models/neoversev2.h: Likewise.
+	* config/aarch64/tuning_models/neoversev3.h: Likewise.
+	* config/aarch64/tuning_models/neoversev3ae.h: Likewise.
+
+2025-07-15  Richard Biener  <rguenther@suse.de>
+	    Richard Sandiford   <richard.sandiford@arm.com>
+
+	PR tree-optimization/121059
+	* tree-vect-stmts.cc (vectorizable_operation): Query
+	scalar_cond_masked_set with the correct number of masks.
+
+2025-07-15  Jakub Jelinek  <jakub@redhat.com>
+	    Jason Merrill  <jason@redhat.com>
+
+	PR c/44677
+	* common.opt (Wunused-but-set-parameter=, Wunused-but-set-variable=):
+	New options.
+	(Wunused-but-set-parameter, Wunused-but-set-variable): Turn into
+	aliases.
+	* common.opt.urls: Regenerate.
+	* diagnostic-spec.cc (nowarn_spec_t::nowarn_spec_t): Use
+	OPT_Wunused_but_set_variable_ instead of OPT_Wunused_but_set_variable
+	and OPT_Wunused_but_set_parameter_ instead of
+	OPT_Wunused_but_set_parameter.
+	* gimple-ssa-store-merging.cc (find_bswap_or_nop_1): Remove unused
+	but set variable tmp.
+	* ipa-strub.cc (pass_ipa_strub::execute): Cast named_args to
+	(void) if ATTR_FNSPEC_DECONST_WATERMARK is not defined.
+	* doc/invoke.texi (Wunused-but-set-parameter=,
+	Wunused-but-set-variable=): Document new options.
+	(Wunused-but-set-parameter, Wunused-but-set-variable): Adjust
+	documentation now that they are just aliases.
+
+2025-07-15  Alfie Richards  <alfie.richards@arm.com>
+
+	* config/aarch64/aarch64-sme.md (@aarch64_sme_<faminmax_uns_op><mode>):
+	Change gating and comment.
+
+2025-07-15  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	Revert:
+	2025-07-11  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* config/aarch64/aarch64-simd.md (*eor3qdi4): New
+	define_insn_and_split.
+
+2025-07-15  Spencer Abson  <spencer.abson@arm.com>
+
+	* config/aarch64/aarch64-sve.md (*fcm<cmp_op><mode>_and_combine):
+	Extend from SVE_FULL_F to SVE_F.
+	(*fcmuo<mode>_and_combine): Likewise.
+	(*fcm<cmp_op><mode>_bic_combine): Likewise.
+	(*fcm<cmp_op><mode>_nor_combine): Likewise.
+	(*fcmuo<mode>_bic_combine): Likewise.
+	(*fcmuo<mode>_nor_combine): Likewise.  Move the comment here to
+	above fcmuo<mode>_bic_combine, since it applies to both patterns.
+
+2025-07-15  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* tree.cc: Include memmodel.h.
+
+2025-07-14  Andrew Stubbs  <ams@baylibre.com>
+
+	* config/gcn/gcn-valu.md (vec_cmpu<mode>di_exec): Call gen_vec_cmp*,
+	not gen_vec_cmpu*.
+
+2025-07-14  Richard Biener  <rguenther@suse.de>
+
+	Revert:
+	2025-07-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121059
+	* tree-vect-stmts.cc (vectorizable_operation): Record a
+	loop mask for mask AND operations.
+
+2025-07-14  Juergen Christ  <jchrist@linux.ibm.com>
+
+	* config/s390/vector.md (reduc_plus_scal_<mode>): Implement.
+	(reduc_plus_scal_v2df): Implement.
+	(reduc_plus_scal_v4sf): Implement.
+	(REDUC_FMINMAX): New int iterator.
+	(reduc_fminmax_name): New int attribute.
+	(reduc_minmax): New code iterator.
+	(reduc_minmax_name): New code attribute.
+	(reduc_<reduc_fminmax_name>_scal_v2df): Implement.
+	(reduc_<reduc_fminmax_name>_scal_v4sf): Implement.
+	(reduc_<reduc_minmax_name>_scal_v2df): Implement.
+	(reduc_<reduc_minmax_name>_scal_v4sf): Implement.
+	(REDUCBIN): New code iterator.
+	(reduc_bin_insn): New code attribute.
+	(reduc_<reduc_bin_insn>_scal_v2di): Implement.
+	(reduc_<reduc_bin_insn>_scal_v4si): Implement.
+	(reduc_<reduc_bin_insn>_scal_v8hi): Implement.
+	(reduc_<reduc_bin_insn>_scal_v16qi): Implement.
+
+2025-07-14  Juergen Christ  <jchrist@linux.ibm.com>
+
+	* config/s390/s390.cc (s390_option_override_internal): Remove override.
+
+2025-07-14  Andrew Stubbs  <ams@baylibre.com>
+
+	* config/gcn/gcn-valu.md (add<mode>3<exec_clobber>): Rename ...
+	(add<mode>3<exec>): ... to this, remove the clobber, and change the
+	instruction from v_add_co_u32 to v_add_u32.
+	(add<mode>3_dup<exec_clobber>): Rename ...
+	(add<mode>3_dup<exec>): ... to this, and likewise.
+	(sub<mode>3<exec_clobber>): Rename ...
+	(sub<mode>3<exec>): ... to this, and likewise
+	* config/gcn/gcn.md (addsi3): Remove the DI clobber, and change the
+	instruction from v_add_co_u32 to v_add_u32.
+	(addsi3_scc): Likewise.
+	(subsi3): Likewise, but for v_sub_co_u32.
+	(muldi3): Likewise.
+
+2025-07-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121059
+	* tree-vect-stmts.cc (vectorizable_operation): Record a
+	loop mask for mask AND operations.
+
+2025-07-14  Pan Li  <pan2.li@intel.com>
+
+	* match.pd: Make sure widen mul has twice bitsize
+	of the inputs in SAT_MUL pattern.
+
+2025-07-14  Uros Bizjak  <ubizjak@gmail.com>
+
+	PR target/121015
+	* config/i386/i386-features.cc (ix86_broadcast_inner): Check all
+	0s/1s vectors with standard_sse_constant_p.
+
+2025-07-14  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/120881
+	* config.in: Regenerated.
+	* configure: Likewise.
+	* configure.ac: Add --enable-x86-64-mfentry.
+	* config/i386/i386-options.cc (ix86_option_override_internal):
+	Enable __fentry__ in 64-bit mode if ENABLE_X86_64_MFENTRY is set
+	to 1.  Warn -pg without -mfentry with shrink wrapping enabled.
+	* doc/install.texi: Document --enable-x86-64-mfentry.
+
+2025-07-14  François-Xavier Coudert  <fxcoudert@gcc.gnu.org>
+
+	PR target/120645
+	* config/darwin-driver.cc: Account for latest macOS numbering
+	scheme.
+
+2025-07-14  Paul-Antoine Arras  <parras@baylibre.com>
+
+	PR target/119100
+	* config/riscv/autovec-opt.md (*vfwmacc_vf_<mode>): New pattern to
+	handle both vfwmacc and vfwmsac.
+	(*extend_vf_<mode>): New pattern that serves as an intermediate combine
+	step.
+	* config/riscv/vector-iterators.md (vsubel): New mode attribute. This is
+	just the lower-case version of VSUBEL.
+	* config/riscv/vector.md (@pred_widen_mul_<optab><mode>_scalar): Reorder
+	and swap operands to match the RTL emitted by expand, i.e. first
+	float_extend then vec_duplicate.
+
+2025-07-14  Alfie Richards  <alfie.richards@arm.com>
+
+	* config/aarch64/aarch64-sme.md (@aarch64_sme_<faminmax_uns_op><mode>):
+	New patterns.
+	* config/aarch64/aarch64-sve-builtins-sme.def (svamin): New intrinsics.
+	(svamax): New intrinsics.
+	* config/aarch64/aarch64-sve-builtins-sve2.cc (class faminmaximpl): New
+	class.
+	(svamin): New function.
+	(svamax): New function.
+
+2025-07-14  Haochen Jiang  <haochen.jiang@intel.com>
+
+	* config/i386/i386.h (PTA_PANTHERLAKE): Revmoe KL and WIDEKL.
+	(PTA_CLEARWATERFOREST): Ditto.
+	* doc/invoke.texi: Revise documentation.
+
+2025-07-13  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR middle-end/120866
+	* tree.cc: Add include to tm_p.h.
+
+2025-07-13  Benjamin Wu  <bwu25@cs.washington.edu>
+
+	* gimple.h (GTMA_DOES_GO_IRREVOCABLE): Fix typo.
+
+2025-07-12  Jan Hubicka  <hubicka@ucw.cz>
+
+	* auto-profile.cc (function_instance::~function_instance):
+	Move down in source.
+	(string_table::get_cgraph_node): New member function with
+	logic broken out from ...
+	(function_instance::get_cgraph_node): ... here.
+	(match_with_target): Fix formating.
+	(function_instance::match): Fix formating; do not use iterators
+	after modifying map; remove incorrect set of warned flag.
+	(autofdo_source_profile::offline_external_functions): Keep
+	seen set up to date.
+	(function_instance::read_function_instance): Fix formating.
+
+2025-07-12  Uros Bizjak  <ubizjak@gmail.com>
+
+	* config/i386/mmx.md (mov<V_32:mode>):
+	Use nonimm_or_0_operand predicate for operand 1.
+	(*mov<V_32:mode>_internal): Ditto.
+	(movv2qi): Ditto.
+	(*movv2qi_internal): Ditto.  Use ix86_hardreg_mov_ok
+	in insn condition.
+
+2025-07-12  Xi Ruoyao  <xry111@xry111.site>
+
+	PR rtl-optimization/120983
+	* lra-constraints.cc (process_alt_operands): Allow reloading
+	user hard registers unless the insn is an asm.
+
+2025-07-11  David Malcolm  <dmalcolm@redhat.com>
+
+	* diagnostic-format-html.cc: Include "diagnostic-format-sarif.h",
+	Replace include of "diagnostic-state.h" with includes of
+	"diagnostic-digraphs.h" and "diagnostic-state-graphs.h".
+	(html_generation_options::html_generation_options): Update for
+	field renaming.
+	(html_builder::m_body_element): New field.
+	(html_builder::html_builder): Initialize m_body_element.
+	(html_builder::maybe_make_state_diagram): Port from XML
+	implementation to state graph implementation.
+	(html_builder::make_element_for_diagnostic): Add any
+	per-diagnostic graphs.
+	(html_builder::add_graph): New.
+	(html_builder::emit_global_graph): New.
+	(html_output_format::report_global_digraph): New.
+	* diagnostic-format-html.h
+	(html_generation_options::m_show_state_diagram_xml): Replace
+	with...
+	(html_generation_options::m_show_state_diagrams_sarif): ...this.
+	(html_generation_options::m_show_state_diagram_dot_src): Rename
+	to...
+	(html_generation_options::m_show_state_diagrams_dot_src): ...this.
+	* diagnostic-format-sarif.cc: Include "diagnostic-digraphs.h" and
+	"diagnostic-state-graphs.h".
+	(sarif_builder::m_run_graphs): New field.
+	(sarif_result::on_nested_diagnostic): Update call to
+	make_location_object to pass arg by pointer.
+	(sarif_builder::sarif_builder): Initialize m_run_graphs.
+	(sarif_builder::report_global_digraph): New.
+	(sarif_builder::make_result_object): Add any graphs to
+	the result object.
+	(sarif_builder::make_locations_arr): Update call to
+	make_location_object to pass arg by pointer.
+	(sarif_builder::make_location_object): Pass param "loc_mgr" by
+	pointer rather than by reference so that it can be null, and
+	handle this case.
+	(copy_any_property_bag): New.
+	(make_sarif_graph): New.
+	(make_sarif_node): New.
+	(make_sarif_edge): New.
+	(sarif_property_bag::set_graph): New.
+	(populate_thread_flow_location_object): Port from XML
+	implementation to state graph implementation.
+	(make_run_object): Store any graphs.
+	(sarif_output_format::report_global_digraph): New.
+	(sarif_generation_options::sarif_generation_options): Rename
+	m_xml_state to m_state_graph.
+	(selftest::test_make_location_object): Update for change to
+	make_location_object.
+	* diagnostic-format-sarif.h:
+	(sarif_generation_options::m_xml_state): Replace with...
+	(sarif_generation_options::m_state_graph): ...this.
+	(class sarif_location_manager): Add forward decl.
+	(diagnostics::digraphs::digraph): New forward decl.
+	(diagnostics::digraphs::node): New forward decl.
+	(diagnostics::digraphs::edge): New forward decl.
+	(sarif_property_bag::set_graph): New decl.
+	(class sarif_graph): New.
+	(class sarif_node): New.
+	(class sarif_edge): New.
+	(make_sarif_graph): New decl.
+	(make_sarif_node): New decl.
+	(make_sarif_edge): New decl.
+	* diagnostic-format-text.h
+	(diagnostic_text_output_format::report_global_digraph): New.
+	* diagnostic-format.h
+	(diagnostic_output_format::report_global_digraph): New vfunc.
+	* diagnostic-digraphs.cc: New file.
+	* diagnostic-digraphs.h: New file.
+	* diagnostic-metadata.h (diagnostics::digraphs::lazy_digraphs):
+	New forward decl.
+	(diagnostic_metadata::diagnostic_metadata): Initialize
+	m_lazy_digraphs.
+	(diagnostic_metadata::set_lazy_digraphs): New.
+	(diagnostic_metadata::get_lazy_digraphs): New.
+	(diagnostic_metadata::m_lazy_digraphs): New field.
+	* diagnostic-output-spec.cc (sarif_scheme_handler::make_sink):
+	Update for XML to state graph changes.
+	(sarif_scheme_handler::make_sarif_gen_opts): Likewise.
+	(html_scheme_handler::make_sink): Rename "show-state-diagram-xml"
+	to "show-state-diagrams-sarif" and use pluralization consistently.
+	* diagnostic-path.cc: Replace include of "xml.h" with
+	"diagnostic-state-graphs.h".
+	(diagnostic_event::maybe_make_xml_state): Replace with...
+	(diagnostic_event::maybe_make_diagnostic_state_graph): ...this.
+	* diagnostic-path.h (diagnostics::digraphs::digraph): New forward
+	decl.
+	(diagnostic_event::maybe_make_xml_state): Replace with...
+	(diagnostic_event::maybe_make_diagnostic_state_graph): ...this.
+	* diagnostic-state-graphs.cc: New file.
+	* diagnostic-state-graphs.h: New file.
+	* diagnostic-state-to-dot.cc: Port implementation from XML to
+	state graphs.
+	* diagnostic-state.h: Deleted file.
+	* diagnostic.cc (diagnostic_context::report_global_digraph): New.
+	* diagnostic.h (diagnostics::digraphs::lazy_digraph): New forward
+	decl.
+	(diagnostic_context::report_global_digraph): New decl.
+	* doc/analyzer.texi (Debugging the Analyzer): Update to reflect
+	change from XML to state graphs.
+	* doc/invoke.texi ("sarif" diagnostics sink): Replace "xml-state"
+	with "state-graphs".
+	("experimental-html" diagnostics sink): Replace
+	"show-state-diagrams-xml" with "show-state-diagrams-sarif"
+	* doc/libgdiagnostics/topics/compatibility.rst
+	(LIBGDIAGNOSTICS_ABI_3): New.
+	* doc/libgdiagnostics/topics/graphs.rst: New file.
+	* doc/libgdiagnostics/topics/index.rst: Add graphs.rst.
+	* graphviz.h (node_id::operator=): New.
+	* json.h (json::value::dyn_cast_string): New.
+	(json::object::get_num_keys): New accessor.
+	(json::object::get_key): New accessor.
+	(json::string::dyn_cast_string): New.
+	* libgdiagnostics++.h (class libgdiagnostics::graph): New.
+	(class libgdiagnostics::node): New.
+	(class libgdiagnostics::edge): New.
+	(class libgdiagnostics::diagnostic::take_graph): New.
+	(class libgdiagnostics::manager::take_global_graph): New.
+	(class libgdiagnostics::graph::set_description): New.
+	(class libgdiagnostics::graph::get_node_by_id): New.
+	(class libgdiagnostics::graph::get_edge_by_id): New.
+	(class libgdiagnostics::graph::add_edge): New.
+	(class libgdiagnostics::node::set_label): New.
+	(class libgdiagnostics::node::set_location): New.
+	(class libgdiagnostics::node::set_logical_location): New.
+	* libgdiagnostics-private.h: New file.
+	* libgdiagnostics.cc: Define INCLUDE_STRING.  Include
+	"diagnostic-digraphs.h", "diagnostic-state-graphs.h", and
+	"libgdiagnostics-private.h".
+	(struct diagnostic_graph): New.
+	(struct diagnostic_node): New.
+	(struct diagnostic_edge): New.
+	(libgdiagnostics_path_event::libgdiagnostics_path_event): Add
+	state_graph param.
+	(libgdiagnostics_path_event::maybe_make_diagnostic_state_graph):
+	New.
+	(libgdiagnostics_path_event::m_state_graph): New field.
+	(diagnostic_execution_path::add_event_va): Add state_graph param.
+	(class prebuilt_digraphs): New.
+	(diagnostic::diagnostic): Use m_graphs in m_metadata.
+	(diagnostic::take_graph): New.
+	(diagnostic::get_graphs): New accessor.
+	(diagnostic::m_graphs): New field.
+	(diagnostic_manager::take_global_graph): New.
+	(diagnostic_execution_path_add_event): Update for new param to
+	add_event_va.
+	(diagnostic_execution_path_add_event_va): Likewise.
+	(diagnostic_graph::add_node_with_id): New public entrypoint.
+	(diagnostic_graph::add_edge_with_label): New public entrypoint.
+	(diagnostic_manager_new_graph): New public entrypoint.
+	(diagnostic_manager_take_global_graph): New public entrypoint.
+	(diagnostic_take_graph): New public entrypoint.
+	(diagnostic_graph_release): New public entrypoint.
+	(diagnostic_graph_set_description): New public entrypoint.
+	(diagnostic_graph_add_node): New public entrypoint.
+	(diagnostic_graph_add_edge): New public entrypoint.
+	(diagnostic_graph_get_node_by_id): New public entrypoint.
+	(diagnostic_graph_get_edge_by_id): New public entrypoint.
+	(diagnostic_node_set_location): New public entrypoint.
+	(diagnostic_node_set_label): New public entrypoint.
+	(diagnostic_node_set_logical_location): New public entrypoint.
+	(private_diagnostic_execution_path_add_event_2): New private
+	entrypoint.
+	(private_diagnostic_graph_set_property_bag): New private
+	entrypoint.
+	(private_diagnostic_node_set_property_bag): New private
+	entrypoint.
+	(private_diagnostic_edge_set_property_bag): New private
+	entrypoint.
+	* libgdiagnostics.h (diagnostic_graph): New typedef.
+	(diagnostic_node): New typedef.
+	(diagnostic_edge): New typedef.
+	(diagnostic_manager_new_graph): New decl.
+	(diagnostic_manager_take_global_graph): New decl.
+	(diagnostic_take_graph): New decl.
+	(diagnostic_graph_release): New decl.
+	(diagnostic_graph_set_description): New decl.
+	(diagnostic_graph_add_node): New decl.
+	(diagnostic_graph_add_edge): New decl.
+	(diagnostic_graph_get_node_by_id): New decl.
+	(diagnostic_graph_get_edge_by_id): New decl.
+	(diagnostic_node_set_label): New decl.
+	(diagnostic_node_set_location): New decl.
+	(diagnostic_node_set_logical_location): New decl.
+	* libgdiagnostics.map (LIBGDIAGNOSTICS_ABI_3): New.
+	* libsarifreplay.cc: Include "libgdiagnostics-private.h".
+	(id_map): New "using".
+	(sarif_replayer::report_invalid_sarif): Update for change to
+	report_problem params.
+	(sarif_replayer::report_unhandled_sarif): Likewise.
+	(sarif_replayer::report_note): New.
+	(sarif_replayer::report_problem): Pass param "ref" by
+	pointer rather than reference and handle it being null.
+	(sarif_replayer::maybe_get_property_bag): New.
+	(sarif_replayer::maybe_get_property_bag_value): New.
+	(sarif_replayer::handle_run_obj): Handle run-level "graphs" as per
+	§3.14.20.
+	(sarif_replayer::handle_result_obj): Handle result-level "graphs"
+	as per §3.27.19.
+	(handle_thread_flow_location_object): Optionally handle graphs
+	stored in property "gcc/diagnostic_event/state_graph" as state
+	graphs.
+	(sarif_replayer::handle_graph_object): New.
+	(sarif_replayer::handle_node_object): New.
+	(sarif_replayer::handle_edge_object): New.
+	(sarif_replayer::get_graph_node_by_id_property): New.
+	* selftest-run-tests.cc (selftest::run_tests): Call
+	selftest::diagnostic_graph_cc_tests and
+	selftest::diagnostic_state_graph_cc_tests.
+	* selftest.h (selftest::diagnostic_graph_cc_tests): New decl.
+	(selftest::diagnostic_state_graph_cc_tests): New decl.
+
+2025-07-11  David Malcolm  <dmalcolm@redhat.com>
+
+	* Makefile.in (OBJS-libcommon): Add diagnostic-digraphs.o and
+	diagnostic-state-graphs.o.
+
+2025-07-11  David Malcolm  <dmalcolm@redhat.com>
+
+	* json.cc (json::object::clone): New.
+	(json::object::clone_as_object): New.
+	(json::array::clone): New.
+	(json::float_number::clone): New.
+	(json::integer_number::clone): New.
+	(json::string::clone): New.
+	(json::literal::clone): New.
+	(selftest::test_cloning): New test.
+	(selftest::json_cc_tests): Call it.
+	* json.h (json::value::clone): New vfunc.
+	(json::object::clone): New decl.
+	(json::object::clone_as_object): New decl.
+	(json::array::clone): New decl.
+	(json::float_number::clone): New decl.
+	(json::integer_number::clone): New decl.
+	(json::string::clone): New decl.
+	(json::literal::clone): New decl.
+
+2025-07-11  David Malcolm  <dmalcolm@redhat.com>
+
+	* json.cc (string::string): When constructing from pointer and
+	length, ensure the new buffer is null-terminated.
+	(selftest::test_strcmp): New.
+	(selftest::json_cc_tests): Likewise.
+
+2025-07-11  David Malcolm  <dmalcolm@redhat.com>
+
+	* doc/libgdiagnostics/topics/compatibility.rst
+	(_LIBGDIAGNOSTICS_ABI_2): Add missing anchor.
+	* doc/libgdiagnostics/topics/diagnostic-manager.rst
+	(diagnostic_manager_add_sink_from_spec): Add links to GCC's
+	documentation of "-fdiagnostics-add-output=".  Fix parameter
+	markup.
+	(diagnostic_manager_set_analysis_target): Fix parameter markup.
+	Add link to SARIF spec.
+	* doc/libgdiagnostics/topics/logical-locations.rst: Markup fix.
+	* doc/libgdiagnostics/tutorial/02-physical-locations.rst: Clarify
+	wording of what "the source file" means, and that a range can't
+	have multiple files.
+
+2025-07-11  Vladimir N. Makarov  <vmakarov@redhat.com>
+
+	* lra-constraints.cc (process_address_1): When changing base reg
+	on a reg of the base class, fall back to reload of whole inner address.
+	(process_address): Constrain the iteration number.
+
+2025-07-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119064
+	* doc/invoke.texi (Wc++26-compat): Document.
+
+2025-07-11  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/121027
+	* config/aarch64/aarch64.cc (aarch64_evpc_sve_tbl): Punt on 2-input
+	operations that can be handled by vec_perm.
+
+2025-07-11  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* config/aarch64/aarch64-simd.md (*eor3qdi4): New
+	define_insn_and_split.
+
+2025-07-11  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* config/aarch64/aarch64-simd.md (*bcaxqdi4): New
+	define_insn_and_split.
+
+2025-07-11  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* config/aarch64/aarch64-simd.md (eor3q<mode>4): Use VDQ_I mode
+	iterator.
+
+2025-07-11  Kyrylo Tkachov  <ktkachov@nvidia.com>
+
+	* config/aarch64/aarch64-simd.md (bcaxq<mode>4): Use VDQ_I mode
+	iterator.
+
+2025-07-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121034
+	* tree-vect-loop.cc (vectorizable_reduction): Cleanup
+	reduction chain following code.
+
+2025-07-11  Jan Hubicka  <hubicka@ucw.cz>
+
+	* opts.cc (finish_options): Enable debug_nonbind_markers_p for
+	auto-profile.
+	* tree-cfg.cc (struct locus_discrim_map): Remove.
+	(struct locus_discrim_hasher): Remove.
+	(locus_discrim_hasher::hash): Remove.
+	(locus_discrim_hasher::equal): Remove.
+	(first_non_label_nondebug_stmt): Remove.
+	(build_gimple_cfg): Do not allocate discriminator tables.
+	(next_discriminator_for_locus): Remove.
+	(same_line_p): Remove.
+	(struct discrim_entry): New structure.
+	(assign_discriminator): Rewrite.
+	(assign_discriminators): Rewrite.
+
+2025-07-11  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR ipa/114790
+	* cgraph.cc (cgraph_update_edges_for_call_stmt_node): Resolve devirtualization
+	if call statement was optimized out or turned to direct call.
+
+2025-07-11  Jakub Jelinek  <jakub@redhat.com>
+	    Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/121023
+	* ipa-fnsummary.cc (compute_fn_summary): Disallow signature changes
+	on cfun->has_musttail functions.
+
+2025-07-11  Hu, Lin1  <lin1.hu@intel.com>
+
+	PR target/91384
+	* config/i386/i386.md: Add new peeophole2 for optimize *negsi_1
+	followed by *cmpsi_ccno_1 with APX_F.
+
+2025-07-11  Richard Biener  <rguenther@suse.de>
+
+	* config/i386/i386.cc (ix86_vector_costs::add_stmt_cost): Use
+	the LHS of a scalar stmt to determine mode and whether it is FP.
+
 2025-07-10  Richard Sandiford  <richard.sandiford@arm.com>
 
 	* config/aarch64/aarch64.cc (aarch64_vector_costs::add_stmt_cost):

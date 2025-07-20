@@ -1,3 +1,39 @@
+2025-07-16  Kwok Cheung Yeung  <kcyeung@baylibre.com>
+
+	* c-omp.cc (c_finish_omp_depobj): Use OMP_ITERATOR_DECL_P.
+
+2025-07-16  Alfie Richards  <alfie.richards@arm.com>
+
+	* c-attribs.cc (handle_target_clones_attribute): Change to use
+	get_clone_versions.
+
+2025-07-16  Alfie Richards  <alfie.richards@arm.com>
+
+	* c-format.cc (local_string_slice_node): New node type.
+	(asm_fprintf_char_table): New entry.
+	(init_dynamic_diag_info): Add support for string_slice.
+	* c-format.h (T_STRING_SLICE): New node type.
+
+2025-07-15  Jakub Jelinek  <jakub@redhat.com>
+	    Jason Merrill  <jason@redhat.com>
+
+	PR c/44677
+	* c-opts.cc (c_common_post_options): Change
+	warn_unused_but_set_parameter and warn_unused_but_set_variable
+	from 1 to 3 if they were set only implicitly.
+	* c-attribs.cc (build_attr_access_from_parms): Remove unused
+	but set variable nelts.
+
+2025-07-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119064
+	* c.opt (Wc++26-compat): New option.
+	* c.opt.urls: Regenerate.
+	* c-opts.cc (c_common_post_options): Clear warn_cxx26_compat for
+	C++26 or later.
+	* c-cppbuiltin.cc (c_cpp_builtins): For C++26 predefine
+	__cpp_trivial_relocatability=202502L.
+
 2025-07-10  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/117785

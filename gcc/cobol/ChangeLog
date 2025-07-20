@@ -1,3 +1,158 @@
+2025-07-15  Jakub Jelinek  <jakub@redhat.com>
+	    Jason Merrill  <jason@redhat.com>
+
+	PR c/44677
+	* gcobolspec.cc (lang_specific_driver): Remove unused but set variable
+	n_cobol_files.
+
+2025-07-14  Robert Dubner  <rdubner@symas.com>
+
+	* cobol1.cc (cobol_langhook_handle_option): Eliminate cppcheck warnings.
+	* dts.h: Likewise.
+	* except.cc (cbl_enabled_exceptions_t::dump): Likewise.
+	* gcobolspec.cc (lang_specific_driver): Likewise.
+	* genapi.cc (parser_file_merge): Likewise.
+	* gengen.cc (gg_unique_in_function): Likewise.
+	(gg_declare_variable): Likewise.
+	(gg_peek_fn_decl): Likewise.
+	(gg_define_function): Likewise.
+	* genmath.cc (set_up_on_exception_label): Likewise.
+	(set_up_compute_error_label): Likewise.
+	(arithmetic_operation): Likewise.
+	(fast_divide): Likewise.
+	* genutil.cc (get_and_check_refstart_and_reflen): Likewise.
+	(get_depending_on_value_from_odo): Likewise.
+	(get_data_offset): Likewise.
+	(get_binary_value): Likewise.
+	(process_this_exception): Likewise.
+	(copy_little_endian_into_place): Likewise.
+	(refer_is_clean): Likewise.
+	(refer_fill_depends): Likewise.
+	* genutil.h (process_this_exception): Likewise.
+	(copy_little_endian_into_place): Likewise.
+	(refer_is_clean): Likewise.
+	* lexio.cc (check_push_pop_directive): Likewise.
+	(check_source_format_directive): Likewise.
+	(location_in): Likewise.
+	(lexer_input): Likewise.
+	(cdftext::lex_open): Likewise.
+	(lexio_dialect_mf): Likewise.
+	(valid_sequence_area): Likewise.
+	(cdftext::free_form_reference_format): Likewise.
+	(cdftext::segment_line): Likewise.
+	* lexio.h (struct span_t): Likewise.
+	* scan_ante.h (trim_location): Likewise.
+	* symbols.cc (symbol_elem_cmp): Likewise.
+	(symbol_alphabet): Likewise.
+	(end_of_group): Likewise.
+	(cbl_field_t::attr_str): Likewise.
+	(symbols_update): Likewise.
+	(symbol_typedef_add): Likewise.
+	(symbol_field_add): Likewise.
+	(new_temporary_impl): Likewise.
+	(symbol_label_section_exists): Likewise.
+	(symbol_program_callables): Likewise.
+	(file_status_status_of): Likewise.
+	* symfind.cc (is_data_field): Likewise.
+	(finalize_symbol_map2): Likewise.
+	(class in_scope): Likewise.
+	(symbol_match2): Likewise.
+	* util.cc (get_current_dir_name): Likewise.
+	(gb4): Likewise.
+	(class cdf_directives_t): Likewise.
+	(cbl_field_t::report_invalid_initial_value): Likewise.
+	(literal_subscript_oob): Likewise.
+	(cbl_refer_t::str): Likewise.
+	(date_time_fmt): Likewise.
+	(class unique_stack): Likewise.
+	(cobol_set_pp_option): Likewise.
+	(cobol_filename): Likewise.
+	(cobol_filename_restore): Likewise.
+	(gcc_location_set_impl): Likewise.
+	(ydferror): Likewise.
+	(error_msg_direct): Likewise.
+	(yyerror): Likewise.
+	(cbl_unimplemented_at): Likewise.
+
+2025-07-13  Robert Dubner  <rdubner@symas.com>
+
+	* Make-lang.in: Eliminate the .cc.o override.
+	* genapi.cc (level_88_helper): Eliminate cppcheck warning.
+	(get_level_88_domain): Likewise.
+	(get_class_condition_string): Likewise.
+	(parser_call_targets_dump): Likewise.
+	(parser_compile_ecs): Likewise.
+	(initialize_variable_internal): Likewise.
+	(move_tree): Likewise.
+	(combined_name): Likewise.
+	(assembler_label): Likewise.
+	(find_procedure): Likewise.
+	(parser_perform): Likewise.
+	(parser_perform_times): Likewise.
+	(internal_perform_through): Likewise.
+	(internal_perform_through_times): Likewise.
+	(psa_FldLiteralN): Likewise.
+	(psa_FldBlob): Likewise.
+	(parser_accept): Likewise.
+	(parser_accept_exception): Likewise.
+	(parser_accept_exception_end): Likewise.
+	(parser_accept_command_line): Likewise.
+	(parser_accept_envar): Likewise.
+	(parser_display_internal): Likewise.
+	(parser_display): Likewise.
+	(parser_assign): Likewise.
+	(parser_initialize_table): Likewise.
+	(parser_arith_error): Likewise.
+	(parser_arith_error_end): Likewise.
+	(parser_division): Likewise.
+	(label_fetch): Likewise.
+	(parser_label_label): Likewise.
+	(parser_label_goto): Likewise.
+	(parser_perform_start): Likewise.
+	(parser_perform_conditional): Likewise.
+	(parser_perform_conditional_end): Likewise.
+	(parser_perform_until): Likewise.
+	(parser_file_delete): Likewise.
+	(parser_intrinsic_subst): Likewise.
+	(create_lsearch_address_pairs): Likewise.
+	(parser_bsearch_start): Likewise.
+	(is_ascending_key): Likewise.
+	(parser_sort): Likewise.
+	(parser_file_sort): Likewise.
+	(parser_return_start): Likewise.
+	(parser_file_merge): Likewise.
+	(parser_string_overflow): Likewise.
+	(parser_unstring): Likewise.
+	(parser_string): Likewise.
+	(parser_call_exception): Likewise.
+	(create_and_call): Likewise.
+	(mh_identical): Likewise.
+	(move_helper): Likewise.
+	(binary_initial_from_float128): Likewise.
+	(initial_from_initial): Likewise.
+	(psa_FldLiteralA): Likewise.
+	(parser_local_add): Likewise.
+	(parser_symbol_add): Likewise.
+	* genapi.h (parser_display): Likewise.
+	* gengen.cc (gg_call_expr): Explict check for NULL_TREE.
+	(gg_call): Likewise.
+	* show_parse.h (SHOW_PARSE_LABEL_OK): Likewise.
+	(TRACE1_FIELD_VALUE): Likewise.
+	(CHECK_FIELD): Likewise.
+	(CHECK_FIELD2): Likewise.
+	(CHECK_LABEL): Likewise.
+	* util.cc (cbl_internal_error): Apply [[noreturn]] attribute.
+	* util.h (cbl_internal_error): Likewise.
+
+2025-07-11  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR cobol/120621
+	* lexio.cc (parse_replace_pairs): Cast mfile.lineno() to fmt_size_t.
+	* parse.y (intrinsic): Print ptrdiff_t using %ld, cast arg to long.
+	* scan_ante.h (numstr_of): Print nx using %ld, cast arg to long.
+	* util.cc (cbl_field_t::report_invalid_initial_value): Print
+	ptrdiff_t using %ld, cast arg to long.
+
 2025-07-10  James K. Lowden  <jklowden@cobolworx.com>
 
 	PR cobol/120765

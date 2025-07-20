@@ -2310,14 +2310,30 @@ mark_exp_read (tree exp)
     case PARM_DECL:
       DECL_READ_P (exp) = 1;
       break;
+    CASE_CONVERT:
+      if (VOID_TYPE_P (TREE_TYPE (exp)))
+	switch (TREE_CODE (TREE_OPERAND (exp, 0)))
+	  {
+	  case PREINCREMENT_EXPR:
+	  case PREDECREMENT_EXPR:
+	  case POSTINCREMENT_EXPR:
+	  case POSTDECREMENT_EXPR:
+	    return;
+	  default:
+	    break;
+	  }
+      /* FALLTHRU */
     case ARRAY_REF:
     case COMPONENT_REF:
     case MODIFY_EXPR:
     case REALPART_EXPR:
     case IMAGPART_EXPR:
-    CASE_CONVERT:
     case ADDR_EXPR:
     case VIEW_CONVERT_EXPR:
+    case PREINCREMENT_EXPR:
+    case PREDECREMENT_EXPR:
+    case POSTINCREMENT_EXPR:
+    case POSTDECREMENT_EXPR:
       mark_exp_read (TREE_OPERAND (exp, 0));
       break;
     case COMPOUND_EXPR:
@@ -7308,8 +7324,21 @@ build_modify_expr (location_t location, tree lhs, tree lhs_origtype,
 		newrhs = build1 (EXCESS_PRECISION_EXPR, TREE_TYPE (rhs),
 				 newrhs);
 	    }
+	  bool clear_decl_read = false;
+	  if ((VAR_P (lhs) || TREE_CODE (lhs) == PARM_DECL)
+	      && !DECL_READ_P (lhs)
+	      && (VAR_P (lhs) ? warn_unused_but_set_variable
+			      : warn_unused_but_set_parameter) > 2)
+	    {
+	      mark_exp_read (newrhs);
+	      if (!DECL_READ_P (lhs))
+		clear_decl_read = true;
+	    }
+
 	  newrhs = build_binary_op (location,
 				    modifycode, lhs, newrhs, true);
+	  if (clear_decl_read)
+	    DECL_READ_P (lhs) = 0;
 
 	  /* The original type of the right hand side is no longer
 	     meaningful.  */
@@ -15608,9 +15637,7 @@ handle_omp_array_sections (tree &c, enum c_omp_region_type ort)
   tree *tp = &OMP_CLAUSE_DECL (c);
   if ((OMP_CLAUSE_CODE (c) == OMP_CLAUSE_DEPEND
        || OMP_CLAUSE_CODE (c) == OMP_CLAUSE_AFFINITY)
-      && TREE_CODE (*tp) == TREE_LIST
-      && TREE_PURPOSE (*tp)
-      && TREE_CODE (TREE_PURPOSE (*tp)) == TREE_VEC)
+      && OMP_ITERATOR_DECL_P (*tp))
     tp = &TREE_VALUE (*tp);
   tree first = handle_omp_array_sections_1 (c, *tp, types,
 					    maybe_zero_len, first_non_one,
@@ -16807,9 +16834,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 	  /* FALLTHRU */
 	case OMP_CLAUSE_AFFINITY:
 	  t = OMP_CLAUSE_DECL (c);
-	  if (TREE_CODE (t) == TREE_LIST
-	      && TREE_PURPOSE (t)
-	      && TREE_CODE (TREE_PURPOSE (t)) == TREE_VEC)
+	  if (OMP_ITERATOR_DECL_P (t))
 	    {
 	      if (TREE_PURPOSE (t) != last_iterators)
 		last_iterators_remove
@@ -16909,10 +16934,7 @@ c_finish_omp_clauses (tree clauses, enum c_omp_region_type ort)
 		      break;
 		    }
 		}
-	      if (TREE_CODE (OMP_CLAUSE_DECL (c)) == TREE_LIST
-		  && TREE_PURPOSE (OMP_CLAUSE_DECL (c))
-		  && (TREE_CODE (TREE_PURPOSE (OMP_CLAUSE_DECL (c)))
-		      == TREE_VEC))
+	      if (OMP_ITERATOR_DECL_P (OMP_CLAUSE_DECL (c)))
 		TREE_VALUE (OMP_CLAUSE_DECL (c)) = t;
 	      else
 		OMP_CLAUSE_DECL (c) = t;

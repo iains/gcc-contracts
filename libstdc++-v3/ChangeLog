@@ -1,3 +1,386 @@
+2025-07-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_iterator_base_types.h (__any_input_iterator):
+	Only define when __cpp_lib_concepts is defined.
+
+2025-07-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/appendix_contributing.xml: Remove Paolo from
+	list of maintainers to contact about contributing.
+	* doc/html/manual/appendix_contributing.html: Regenerate.
+
+2025-07-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/xml/manual/build_hacking.xml: Document that
+	windows_zones-map.h is a generated file.
+	* doc/html/manual/appendix_porting.html: Regenerate.
+
+2025-07-18  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/119137
+	* include/std/inplace_vector (inplace_vector::operator=):
+	Qualify call to std::addressof.
+
+2025-07-18  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/121154
+	* include/bits/chrono_io.h (_ChronoSpec::_M_time_point): Remove.
+	(_ChronoSpec::_M_needs_ok_check): Define
+	(__formatter_chrono::_M_parse): Set _M_needs_ok_check.
+	(__formatter_chrono::_M_check_ok): Check values also for debug mode,
+	and return __string_view.
+	(__formatter_chrono::_M_format_to): Handle results of _M_check_ok.
+	(__formatter_chrono::_M_wi, __formatter_chrono::_M_a_A)
+	(__formatter_chrono::_M_b_B, __formatter_chrono::_M_C_y_Y)
+	(__formatter_chrono::_M_d_e, __formatter_chrono::_M_F):
+	Removed handling of _M_debug.
+	(__formatter_chrono::__M_m): Print zero unpadded in _M_debug mode.
+	(__formatter_duration::_S_spec_for): Remove _M_time_point refernce.
+	(__formatter_duration::_M_parse): Override _M_needs_ok_check.
+	* testsuite/std/time/month/io.cc: Test for localized !ok() values.
+	* testsuite/std/time/weekday/io.cc: Test for localized !ok() values.
+
+2025-07-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/121150
+	* testsuite/20_util/hash/int128.cc: Cast expected values to
+	size_t.
+
+2025-07-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/unicode.h (_Utf_iterator::operator--): Reorder
+	conditions and update position after reading a code unit.
+	(_Utf_iterator::_M_read_reverse): Define.
+	(_Utf_iterator::_M_read_utf8): Return extracted code point.
+	(_Utf_iterator::_M_read_reverse_utf8): Define.
+	(_Utf_iterator::_M_read_reverse_utf16): Define.
+	(_Utf_iterator::_M_read_reverse_utf32): Define.
+	* testsuite/ext/unicode/view.cc: Add checks for reversed views
+	and reverse iteration.
+
+2025-07-18  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/unicode.h (_Utf_iterator): Reorder data members
+	to be more compact.
+
+2025-07-18  Jonathan Wakely  <jwakely@redhat.com>
+	    Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/119137
+	* doc/doxygen/user.cfg.in (INPUT): Add new header.
+	* include/Makefile.am: Add new header.
+	* include/Makefile.in: Regenerate.
+	* include/bits/stl_iterator_base_types.h (__any_input_iterator):
+	Define.
+	* include/bits/version.def (inplace_vector): Define.
+	* include/bits/version.h: Regenerate.
+	* include/precompiled/stdc++.h: Include new header.
+	* src/c++23/std.cc.in: Export contents if new header.
+	* include/std/inplace_vector: New file.
+	* testsuite/23_containers/inplace_vector/access/capacity.cc: New file.
+	* testsuite/23_containers/inplace_vector/access/elem.cc: New file.
+	* testsuite/23_containers/inplace_vector/access/elem_neg.cc: New file.
+	* testsuite/23_containers/inplace_vector/cons/1.cc: New file.
+	* testsuite/23_containers/inplace_vector/cons/from_range.cc: New file.
+	* testsuite/23_containers/inplace_vector/cons/throws.cc: New file.
+	* testsuite/23_containers/inplace_vector/copy.cc: New file.
+	* testsuite/23_containers/inplace_vector/erasure.cc: New file.
+	* testsuite/23_containers/inplace_vector/modifiers/assign.cc: New file.
+	* testsuite/23_containers/inplace_vector/modifiers/erase.cc: New file.
+	* testsuite/23_containers/inplace_vector/modifiers/multi_insert.cc:
+	New file.
+	* testsuite/23_containers/inplace_vector/modifiers/single_insert.cc:
+	New file.
+	* testsuite/23_containers/inplace_vector/move.cc: New file.
+	* testsuite/23_containers/inplace_vector/relops.cc: New file.
+	* testsuite/23_containers/inplace_vector/version.cc: New file.
+	* testsuite/util/testsuite_iterators.h (input_iterator_wrapper::base):
+	Define.
+
+2025-07-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96710
+	* doc/xml/manual/evolution.xml: Document change or __int128.
+	* doc/html/manual/api.html: Regenerate.
+
+2025-07-17  Luc Grosheintz  <luc.grosheintz@gmail.com>
+
+	PR libstdc++/121061
+	* include/std/mdspan (extents::extents): Perform conversion to
+	index_type of an r-value reference.
+	(layout_left::mapping::operator()): Ditto.
+	(layout_right::mapping::operator()): Ditto.
+	(layout_stride::mapping::operator()): Ditto.
+	* testsuite/23_containers/mdspan/extents/custom_integer.cc: Add
+	tests for RValueInt and MutatingInt.
+	* testsuite/23_containers/mdspan/int_like.h (RValueInt): Add.
+	* testsuite/23_containers/mdspan/layouts/mapping.cc: Test with
+	RValueInt.
+	* testsuite/23_containers/mdspan/mdspan.cc: Ditto.
+
+2025-07-17  Luc Grosheintz  <luc.grosheintz@gmail.com>
+
+	PR libstdc++/121061
+	* include/std/mdspan (extents::extents): Fix constraint to
+	prevent non-const conversion to index_type.
+	(layout_stride::mapping::mapping): Ditto.
+	(mdspan::mdspan): Ditto.
+	(mdspan::operator[]): Ditto.
+	* testsuite/23_containers/mdspan/extents/custom_integer.cc: Add
+	test for MutatingInt.
+	* testsuite/23_containers/mdspan/int_like.h (MutatingInt): Add.
+	* testsuite/23_containers/mdspan/layouts/mapping.cc: Add test for
+	MutatingInt.
+	* testsuite/23_containers/mdspan/layouts/stride.cc: Ditto.
+	* testsuite/23_containers/mdspan/mdspan.cc: Ditto.
+
+2025-07-17  Luc Grosheintz  <luc.grosheintz@gmail.com>
+
+	PR libstdc++/121061
+	* testsuite/23_containers/mdspan/extents/custom_integer.cc:
+	Enable checking with different custom integers. Improve
+	checking non-existence of overloads for incompatible custom
+	integers.
+	* testsuite/23_containers/mdspan/layouts/mapping.cc: ditto. Also
+	improve reuse of int_like.h.
+	* testsuite/23_containers/mdspan/layouts/stride.cc: ditto.
+	* testsuite/23_containers/mdspan/mdspan.cc: ditto.
+	* testsuite/23_containers/mdspan/extents/int_like.h: Rename (old
+	name).
+	* testsuite/23_containers/mdspan/int_like.h: Rename (new name).
+	(ThrowingInt): Add.
+	(NotIntLike): Add.
+
+2025-07-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/unicode.h (__unicode::_Utf_iterator): Add
+	comments.
+	(__unicode:_Utf_iterator::operator++()): Check whether to
+	iterate over the buffer first.
+
+2025-07-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/121097
+	* include/c_global/cmath (hypot): Use __promote_3 instead of
+	__promoted.
+
+2025-07-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/bitset (__bitset::__string) [__cpp_lib_bitset]:
+	Change alias to refer to basic_string_view instead.
+
+2025-07-16  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/121114
+	* include/bits/version.def (constexpr_exceptions): Add no_stdname
+	and changed value.
+	* include/bits/version.h: Regenerated.
+	* testsuite/18_support/exception/version.cc: Test that macro is
+	not exported.
+
+2025-07-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/move.h (swap): Replace enable_if with concepts
+	when available, and with __enable_if_t alias otherwise.
+
+2025-07-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ranges_base.h (ranges::advance(i, n, bound)):
+	Ensure that observable side effects on iterators match what is
+	specified in the standard.
+
+2025-07-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/119962
+	* include/std/ranges (join_view::_Iterator::_M_outer): Initialize.
+	(lazy_split_view::_OuterIter::_M_current): Initialize.
+	(join_with_view::_Iterator::_M_outer_it): Initialize.
+	* testsuite/std/ranges/adaptors/join.cc (test15): New test.
+	* testsuite/std/ranges/adaptors/join_with/1.cc (test05): New test.
+	* testsuite/std/ranges/adaptors/lazy_split.cc (test13): New test.
+
+2025-07-15  Björn Schäpers  <bjoern@hazardy.de>
+
+	PR libstdc++/108409
+	* scripts/gen_windows_zones_map.py: New file, generates
+	windows_zones-map.h.
+	* src/c++20/windows_zones-map.h: New file, contains the look up
+	table.
+	* src/c++20/tzdb.cc (tzdb::current_zone): Add Windows code path.
+
+2025-07-15  Björn Schäpers  <bjoern@hazardy.de>
+
+	* src/c++20/tzdb.cc (zoneinfo_file): On Windows look relative
+	from the DLL path for the time zone information.
+
+2025-07-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/25_algorithms/copy/debug/constexpr_neg.cc:
+	* testsuite/25_algorithms/copy_backward/debug/constexpr_neg.cc:
+	* testsuite/25_algorithms/equal/debug/constexpr_neg.cc:
+	* testsuite/25_algorithms/lower_bound/debug/constexpr_partitioned_neg.cc:
+	* testsuite/25_algorithms/lower_bound/debug/constexpr_partitioned_pred_neg.cc:
+	* testsuite/25_algorithms/lower_bound/debug/constexpr_valid_range_neg.cc:
+	* testsuite/25_algorithms/upper_bound/debug/constexpr_partitioned_neg.cc:
+	* testsuite/25_algorithms/upper_bound/debug/constexpr_partitioned_pred_neg.cc:
+	* testsuite/25_algorithms/upper_bound/debug/constexpr_valid_range_neg.cc:
+
+2025-07-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/121024
+	* include/bits/ranges_uninitialized.h (ranges::destroy): Do not
+	optimize away trivial destructors during constant evaluation.
+	(ranges::destroy_n): Likewise.
+	* testsuite/20_util/specialized_algorithms/destroy/121024.cc:
+	New test.
+
+2025-07-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/experimental/memory (swap, make_observer_ptr): Add
+	constexpr.
+	(operator==, operator!=, operator<, operator>, operator<=)
+	(operator>=): Likewise.
+	* testsuite/experimental/memory/observer_ptr/make_observer.cc:
+	Checks for constant evaluation.
+	* testsuite/experimental/memory/observer_ptr/relops/relops.cc:
+	Likewise.
+	* testsuite/experimental/memory/observer_ptr/swap/swap.cc:
+	Likewise.
+
+2025-07-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/type_traits (__make_unsigned_selector): Add
+	unsigned __int128 to type list.
+	* testsuite/20_util/make_unsigned/int128.cc: New test.
+
+2025-07-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96710
+	* include/bits/functional_hash.h (hash<__int128>): Define for
+	strict modes.
+	(hash<unsigned __int128>): Likewise.
+	* testsuite/20_util/hash/int128.cc: New test.
+
+2025-07-15  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/110739
+	* include/bits/chrono_io.h (__formatter_chrono::_S_weekdays)
+	(__formatter_chrono::_S_months, __formatter_chrono::_S_fill_ampm):
+	Define.
+	(__formatter_chrono::_M_format_to): Do not pass context parameter
+	to functions listed below.
+	(__formatter_chrono::_M_a_A, __formatter_chrono::_M_b_B): Implement
+	using harcoded list of names, and remove format context parameter.
+	(__formatter_chrono::_M_p, __formatter_chrono::_M_r): Implement
+	using _S_fill_ampm.
+	(__formatter_chrono::_M_c): Removed format context parameter.
+	(__formatter_chrono::_M_subsecs): Call __ctx.locale() directly,
+	instead of _M_locale and do not compare with locale::classic().
+	Add [[unlikely]] attributes.
+	(__formatter_chrono::_M_locale): Move to __formatter_duration.
+	(__formatter_duration::_M_locale): Moved from __formatter_chrono.
+
+2025-07-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/stl_pair.h (swap): Add comment to deleted
+	overload.
+	* include/bits/unique_ptr.h (swap): Likewise.
+	* include/std/array (swap): Likewise.
+	* include/std/optional (swap): Likewise.
+	* include/std/tuple (swap): Likewise.
+	* include/std/variant (swap): Likewise.
+	* testsuite/23_containers/array/tuple_interface/get_neg.cc:
+	Adjust dg-error line numbers.
+
+2025-07-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/pstl/algorithm_impl.h (__for_each_n_it_serial):
+	Protect against overloaded comma operator.
+	(__brick_walk2): Likewise.
+	(__brick_walk2_n): Likewise.
+	(__brick_walk3): Likewise.
+	(__brick_move_destroy::operator()): Likewise.
+	(__brick_calc_mask_1): Likewise.
+	(__brick_copy_by_mask): Likewise.
+	(__brick_partition_by_mask): Likewise.
+	(__brick_calc_mask_2): Likewise.
+	(__brick_reverse): Likewise.
+	(__pattern_partial_sort_copy): Likewise.
+	* include/pstl/memory_impl.h (__brick_uninitialized_move):
+	Likewise.
+	(__brick_uninitialized_copy): Likewise.
+	* include/pstl/numeric_impl.h (__brick_transform_scan):
+	Likewise.
+
+2025-07-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117785
+	* include/bits/version.def (constexpr_exceptions): Define
+	correct value.
+	* include/bits/version.h: Regenerate.
+	* libsupc++/exception: Check correct value.
+	* testsuite/18_support/exception/version.cc: New test.
+
+2025-07-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* libsupc++/exception_ptr.h (make_exception_ptr): Return null
+	for consteval when -fno-exceptions is used.
+	(exception_ptr_cast): Likewise. Allow consteval path to work
+	with -fno-rtti.
+
+2025-07-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* libsupc++/exception_ptr.h: Implement C++26 P3748R0 - Inspecting
+	exception_ptr should be constexpr.
+	(std::exception_ptr_cast): Make constexpr, remove inline keyword.  Add
+	static_asserts for Mandates.  For if consteval use std::rethrow_exception,
+	catch it and return its address or nullptr.
+	* testsuite/18_support/exception_ptr/exception_ptr_cast.cc (E::~E): Add
+	constexpr.
+	(G::G): Likewise.
+	(test01): Likewise.  Return bool and take bool argument, throw if the
+	argument is true.  Add static_assert(test01(false)).
+	(main): Call test01(true) in try.
+
+2025-07-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/cpp_type_traits.h (__is_floating<__float128>):
+	Do not depend on __STRICT_ANSI__.
+	* include/bits/stl_algobase.h (__size_to_integer(__float128)):
+	Likewise.
+	* include/std/type_traits (__is_floating_point_helper<__float128>):
+	Likewise.
+
+2025-07-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/96710
+	* include/bits/cpp_type_traits.h (__is_integer): Define explicit
+	specializations for __int128.
+	(__memcpyable_integer): Remove explicit specializations for
+	__int128.
+	* include/bits/iterator_concepts.h (incrementable_traits):
+	Likewise.
+	(__is_signed_int128, __is_unsigned_int128, __is_int128): Remove.
+	(__is_integer_like, __is_signed_integer_like): Remove check for
+	__int128.
+	* include/bits/max_size_type.h: Remove all uses of __is_int128
+	in constraints.
+	* include/bits/ranges_base.h (__to_unsigned_like): Remove
+	overloads for __int128.
+	(ranges::ssize): Remove special case for __int128.
+	* include/bits/stl_algobase.h (__size_to_integer): Define
+	__int128 overloads for strict modes.
+	* include/ext/numeric_traits.h (__is_integer_nonstrict): Remove
+	explicit specializations for __int128.
+	* include/std/charconv (to_chars): Define overloads for
+	__int128.
+	* include/std/format (__format::make_unsigned_t): Remove.
+	(__format::to_chars): Remove.
+	* include/std/limits (numeric_limits): Define explicit
+	specializations for __int128.
+	* include/std/type_traits (__is_integral_helper): Likewise.
+	(__make_unsigned, __make_signed): Likewise.
+
 2025-07-10  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/117785

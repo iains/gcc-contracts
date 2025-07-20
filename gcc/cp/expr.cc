@@ -102,6 +102,9 @@ mark_use (tree expr, bool rvalue_p, bool read_p,
   if (reject_builtin && reject_gcc_builtin (expr, loc))
     return error_mark_node;
 
+  if (TREE_TYPE (expr) && VOID_TYPE_P (TREE_TYPE (expr)))
+    read_p = false;
+
   if (read_p)
     mark_exp_read (expr);
 
@@ -211,7 +214,7 @@ mark_use (tree expr, bool rvalue_p, bool read_p,
 	    }
 	  return expr;
 	}
-      gcc_fallthrough();
+      gcc_fallthrough ();
     CASE_CONVERT:
       recurse_op[0] = true;
       break;
@@ -352,6 +355,9 @@ mark_exp_read (tree exp)
   if (exp == NULL)
     return;
 
+  if (TREE_TYPE (exp) && VOID_TYPE_P (TREE_TYPE (exp)))
+    return;
+
   switch (TREE_CODE (exp))
     {
     case VAR_DECL:
@@ -361,16 +367,20 @@ mark_exp_read (tree exp)
     case PARM_DECL:
       DECL_READ_P (exp) = 1;
       break;
+    CASE_CONVERT:
     case ARRAY_REF:
     case COMPONENT_REF:
     case MODIFY_EXPR:
     case REALPART_EXPR:
     case IMAGPART_EXPR:
-    CASE_CONVERT:
     case ADDR_EXPR:
     case INDIRECT_REF:
     case FLOAT_EXPR:
     case VIEW_CONVERT_EXPR:
+    case PREINCREMENT_EXPR:
+    case PREDECREMENT_EXPR:
+    case POSTINCREMENT_EXPR:
+    case POSTDECREMENT_EXPR:
       mark_exp_read (TREE_OPERAND (exp, 0));
       break;
     case COMPOUND_EXPR:

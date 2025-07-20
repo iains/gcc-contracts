@@ -2141,7 +2141,7 @@ convertible_comparison_p (rtx_insn *insn, enum machine_mode mode)
 
   gcc_assert (GET_CODE (src) == COMPARE);
 
-  if (GET_CODE (dst) != REG
+  if (!REG_P (dst)
       || REGNO (dst) != FLAGS_REG
       || GET_MODE (dst) != CCZmode)
     return false;
@@ -2953,7 +2953,7 @@ rest_of_insert_endbr_and_patchable_area (bool need_endbr,
 
 		  /* Also generate ENDBRANCH for non-tail call which
 		     may return via indirect branch.  */
-		  if (GET_CODE (XEXP (fnaddr, 0)) == SYMBOL_REF)
+		  if (SYMBOL_REF_P (XEXP (fnaddr, 0)))
 		    fndecl = SYMBOL_REF_DECL (XEXP (fnaddr, 0));
 		  if (fndecl == NULL_TREE)
 		    fndecl = MEM_EXPR (fnaddr);
@@ -3534,22 +3534,20 @@ ix86_broadcast_inner (rtx op, machine_mode mode,
 		      machine_mode *scalar_mode_p,
 		      x86_cse_kind *kind_p, rtx_insn **insn_p)
 {
-  if (op == const0_rtx || op == CONST0_RTX (mode))
+  switch (standard_sse_constant_p (op, mode))
     {
+    case 1:
       *scalar_mode_p = QImode;
       *kind_p = X86_CSE_CONST0_VECTOR;
       *insn_p = nullptr;
       return const0_rtx;
-    }
-  else if ((GET_MODE_CLASS (mode) == MODE_VECTOR_INT
-	    && (op == constm1_rtx || op == CONSTM1_RTX (mode)))
-	    || (GET_MODE_CLASS (mode) == MODE_VECTOR_FLOAT
-		&& float_vector_all_ones_operand (op, mode)))
-    {
+    case 2:
       *scalar_mode_p = QImode;
       *kind_p = X86_CSE_CONSTM1_VECTOR;
       *insn_p = nullptr;
       return constm1_rtx;
+    default:
+      break;
     }
 
   mode = GET_MODE (op);
