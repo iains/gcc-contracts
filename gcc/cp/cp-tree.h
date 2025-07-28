@@ -7490,7 +7490,7 @@ extern void maybe_warn_variadic_templates       (void);
 extern void maybe_warn_cpp0x			(cpp0x_warn_str str,
 						 location_t = input_location);
 extern bool pedwarn_cxx98                       (location_t,
-						 diagnostic_option_id option_id,
+						 diagnostics::option_id option_id,
 						 const char *, ...) ATTRIBUTE_GCC_DIAG(3,4);
 extern location_t location_of                   (tree);
 extern void qualified_name_lookup_error		(tree, tree, tree,
@@ -7516,6 +7516,7 @@ extern int nothrow_libfn_p			(const_tree);
 extern void check_handlers			(tree);
 extern tree finish_noexcept_expr		(tree, tsubst_flags_t);
 extern bool expr_noexcept_p			(tree, tsubst_flags_t);
+extern void explain_not_noexcept		(tree);
 extern void perform_deferred_noexcept_checks	(void);
 extern bool nothrow_spec_p			(const_tree);
 extern bool type_noexcept_p			(const_tree);
@@ -7637,11 +7638,14 @@ extern void finish_thunk			(tree);
 extern void use_thunk				(tree, bool);
 extern bool trivial_fn_p			(tree);
 extern tree forward_parm			(tree);
-extern bool is_trivially_xible			(enum tree_code, tree, tree);
-extern bool is_nothrow_xible			(enum tree_code, tree, tree);
-extern bool is_xible				(enum tree_code, tree, tree);
-extern bool is_convertible			(tree, tree);
-extern bool is_nothrow_convertible		(tree, tree);
+extern bool is_trivially_xible			(enum tree_code, tree, tree,
+						 bool = false);
+extern bool is_nothrow_xible			(enum tree_code, tree, tree,
+						 bool = false);
+extern bool is_xible				(enum tree_code, tree, tree,
+						 bool = false);
+extern bool is_convertible			(tree, tree, bool = false);
+extern bool is_nothrow_convertible		(tree, tree, bool = false);
 extern bool ref_xes_from_temporary		(tree, tree, bool);
 extern tree get_defaulted_eh_spec		(tree, tsubst_flags_t = tf_warning_or_error);
 extern bool maybe_explain_implicit_delete	(tree);
@@ -8495,9 +8499,9 @@ extern void cxx_print_xnode			(FILE *, tree, int);
 extern void cxx_print_decl			(FILE *, tree, int);
 extern void cxx_print_type			(FILE *, tree, int);
 extern void cxx_print_identifier		(FILE *, tree, int);
-extern void cxx_print_error_function		(diagnostic_text_output_format &,
+extern void cxx_print_error_function		(diagnostics::text_sink &,
 						 const char *,
-						 const diagnostic_info *);
+						 const diagnostics::diagnostic_info *);
 
 /* in typeck.cc */
 /* Says how we should behave when comparing two arrays one of which
@@ -8684,7 +8688,7 @@ extern void maybe_warn_pessimizing_move	     (tree, tree, bool);
 /* in typeck2.cc */
 extern void require_complete_eh_spec_types	(tree, tree);
 extern bool cxx_incomplete_type_diagnostic	(location_t, const_tree,
-						 const_tree, diagnostic_t);
+						 const_tree, enum diagnostics::kind);
 inline location_t
 loc_or_input_loc (location_t loc)
 {
@@ -8732,7 +8736,7 @@ cp_expr_loc_or_input_loc (const_tree t)
 
 inline bool
 cxx_incomplete_type_diagnostic (const_tree value, const_tree type,
-				diagnostic_t diag_kind)
+				enum diagnostics::kind diag_kind)
 {
   return cxx_incomplete_type_diagnostic (cp_expr_loc_or_input_loc (value),
 					 value, type, diag_kind);
@@ -8743,7 +8747,7 @@ extern void cxx_incomplete_type_error		(location_t, const_tree,
 inline void
 cxx_incomplete_type_error (const_tree value, const_tree type)
 {
-  cxx_incomplete_type_diagnostic (value, type, DK_ERROR);
+  cxx_incomplete_type_diagnostic (value, type, diagnostics::kind::error);
 }
 
 extern void cxx_incomplete_type_inform 	        (const_tree);
@@ -8815,7 +8819,7 @@ extern alias_set_type cxx_get_alias_set		(tree);
 extern bool cxx_warn_unused_global_decl		(const_tree);
 extern size_t cp_tree_size			(enum tree_code);
 extern bool cp_var_mod_type_p			(tree, tree);
-extern void cxx_initialize_diagnostics		(diagnostic_context *);
+extern void cxx_initialize_diagnostics		(diagnostics::context *);
 extern int cxx_types_compatible_p		(tree, tree);
 extern bool cxx_block_may_fallthru		(const_tree);
 
@@ -8961,6 +8965,8 @@ extern bool constraints_equivalent_p            (tree, tree);
 extern bool atomic_constraints_identical_p	(tree, tree);
 extern hashval_t iterative_hash_constraint      (tree, hashval_t);
 extern hashval_t hash_atomic_constraint         (tree);
+extern void diagnose_trait_expr			(location_t, tree, tree);
+extern bool maybe_diagnose_standard_trait	(location_t, tree);
 extern void diagnose_constraints                (location_t, tree, tree);
 
 extern void note_failed_type_completion		(tree, tsubst_flags_t);

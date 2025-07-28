@@ -3883,9 +3883,9 @@ class GTY((chain_next ("%h.parent"), for_user)) module_state {
   void write_macro_maps (elf_out *to, range_t &, unsigned *crc_ptr);
   bool read_macro_maps (line_map_uint_t);
 
-  void write_diagnostic_classification (elf_out *, diagnostic_context *,
+  void write_diagnostic_classification (elf_out *, diagnostics::context *,
 					unsigned *);
-  bool read_diagnostic_classification (diagnostic_context *);
+  bool read_diagnostic_classification (diagnostics::context *);
 
  private:
   void write_define (bytes_out &, const cpp_macro *);
@@ -4822,7 +4822,8 @@ noisy_p ()
     return false;
 
   pp_needs_newline (global_dc->get_reference_printer ()) = true;
-  diagnostic_set_last_function (global_dc, (diagnostic_info *) NULL);
+  diagnostic_set_last_function (global_dc,
+				(diagnostics::diagnostic_info *) nullptr);
 
   return true;
 }
@@ -6785,6 +6786,13 @@ trees_out::core_vals (tree t)
       if (streaming_p ())
 	WU (((lang_tree_node *)t)->trait_expression.kind);
       break;
+
+    case TU_LOCAL_ENTITY:
+      WT (((lang_tree_node *)t)->tu_local_entity.name);
+      if (state)
+	state->write_location
+	  (*this, ((lang_tree_node *)t)->tu_local_entity.loc);
+      break;
     }
 
   if (CODE_CONTAINS_STRUCT (code, TS_TYPED))
@@ -7328,6 +7336,11 @@ trees_in::core_vals (tree t)
       RT (((lang_tree_node *)t)->trait_expression.type2);
       RUC (cp_trait_kind, ((lang_tree_node *)t)->trait_expression.kind);
       break;
+
+    case TU_LOCAL_ENTITY:
+      RT (((lang_tree_node *)t)->tu_local_entity.name);
+      ((lang_tree_node *)t)->tu_local_entity.loc
+	= state->read_location (*this);
     }
 
   if (CODE_CONTAINS_STRUCT (code, TS_TYPED))
@@ -10268,7 +10281,8 @@ trees_in::tree_node (bool is_use)
 	    && dump ("Read %stypedef %C:%N",
 		     DECL_IMPLICIT_TYPEDEF_P (res) ? "implicit " : "",
 		     TREE_CODE (res), res);
-	  res = TREE_TYPE (res);
+	  if (TREE_CODE (res) != TU_LOCAL_ENTITY)
+	    res = TREE_TYPE (res);
 	}
       break;
 
@@ -18325,22 +18339,23 @@ module_state::write_ordinary_maps (elf_out *to, range_t &info,
 /* Return the prefix to use for dumping a #pragma diagnostic change to DK.  */
 
 static const char *
-dk_string (diagnostic_t dk)
+dk_string (enum diagnostics::kind dk)
 {
-  gcc_assert (dk > DK_UNSPECIFIED && dk < DK_LAST_DIAGNOSTIC_KIND);
-  if (dk == DK_IGNORED)
-    /* diagnostic.def has an empty string for ignored.  */
+  gcc_assert (dk > diagnostics::kind::unspecified
+	      && dk < diagnostics::kind::last_diagnostic_kind);
+  if (dk == diagnostics::kind::ignored)
+    /* diagnostics/kinds.def has an empty string for ignored.  */
     return "ignored: ";
   else
-    return get_diagnostic_kind_text (dk);
+    return diagnostics::get_text_for_kind (dk);
 }
 
 /* Dump one #pragma GCC diagnostic entry.  */
 
 static bool
-dump_dc_change (unsigned index, unsigned opt, diagnostic_t dk)
+dump_dc_change (unsigned index, unsigned opt, enum diagnostics::kind dk)
 {
-  if (dk == DK_POP)
+  if (dk == diagnostics::kind::pop)
     return dump (" Index %u: pop from %d", index, opt);
   else
     return dump (" Index %u: %s%s", index, dk_string (dk),
@@ -18351,7 +18366,7 @@ dump_dc_change (unsigned index, unsigned opt, diagnostic_t dk)
 
 void
 module_state::write_diagnostic_classification (elf_out *to,
-					       diagnostic_context *dc,
+					       diagnostics::context *dc,
 					       unsigned *crc_p)
 {
   auto &changes = dc->get_classification_history ();
@@ -18367,9 +18382,10 @@ module_state::write_diagnostic_classification (elf_out *to,
   unsigned len = changes.length ();
 
   /* We don't want to write out any entries that came from one of our imports.
-     But then we need to adjust the total, and change DK_POP targets to match
-     the index in our actual output.  So remember how many lines we had skipped
-     at each step, where -1 means this line itself is skipped.  */
+     But then we need to adjust the total, and change diagnostics::kind::pop
+     targets to match the index in our actual output.  So remember how many
+     lines we had skipped at each step, where -1 means this line itself
+     is skipped.  */
   int skips = 0;
   auto_vec<int> skips_at (len);
   skips_at.safe_grow (len);
@@ -18402,10 +18418,10 @@ module_state::write_diagnostic_classification (elf_out *to,
       if (sec.streaming_p ())
 	{
 	  unsigned opt = c.option;
-	  if (c.kind == DK_POP)
+	  if (c.kind == diagnostics::kind::pop)
 	    opt -= skips_at[opt];
 	  sec.u (opt);
-	  sec.u (c.kind);
+	  sec.u (static_cast<unsigned> (c.kind));
 	  dump () && dump_dc_change (i - skips_at[i], opt, c.kind);
 	}
     }
@@ -18420,7 +18436,7 @@ module_state::write_diagnostic_classification (elf_out *to,
 /* Read any #pragma GCC diagnostic info from the .dgc section.  */
 
 bool
-module_state::read_diagnostic_classification (diagnostic_context *dc)
+module_state::read_diagnostic_classification (diagnostics::context *dc)
 {
   bytes_in sec;
 
@@ -18440,8 +18456,8 @@ module_state::read_diagnostic_classification (diagnostic_context *dc)
     {
       location_t loc = read_location (sec);
       int opt = sec.u ();
-      diagnostic_t kind = (diagnostic_t) sec.u ();
-      if (kind == DK_POP)
+      enum diagnostics::kind kind = (enum diagnostics::kind) sec.u ();
+      if (kind == diagnostics::kind::pop)
 	/* For a pop, opt is the 'changes' index to return to.  */
 	opt += offset;
       changes.quick_push ({ loc, opt, kind });
@@ -18456,7 +18472,7 @@ module_state::read_diagnostic_classification (diagnostic_context *dc)
 	gcc_checking_assert (i >= offset);
 
 	const auto &c = changes[i];
-	if (c.kind != DK_POP)
+	if (c.kind != diagnostics::kind::pop)
 	  break;
 	else if (c.option == offset)
 	  {
@@ -18473,7 +18489,7 @@ module_state::read_diagnostic_classification (diagnostic_context *dc)
       /* It didn't, so add a pop at its last location to avoid affecting later
 	 imports.  */
       location_t last_loc = ordinary_locs.first + ordinary_locs.second - 1;
-      changes.quick_push ({ last_loc, offset, DK_POP });
+      changes.quick_push ({ last_loc, offset, diagnostics::kind::pop });
       dump () && dump (" Adding final pop from index %d", offset);
     }
 

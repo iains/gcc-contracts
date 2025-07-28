@@ -3706,6 +3706,7 @@ package body Sem_Util is
            Aspect_Aggregate,
            Aspect_Max_Entry_Queue_Length
            --  , Aspect_No_Controlled_Parts
+           --  , Aspect_No_Task_Parts
           );
 
       --  Note that none of these 8 aspects can be specified (for a type)
@@ -10061,16 +10062,19 @@ package body Sem_Util is
            and then not Has_Unknown_Discriminants (Utyp)
            and then not (Ekind (Utyp) = E_String_Literal_Subtype)
       then
-         --  Nothing to do if in spec expression (why not???)
+         --  If the type has no discriminants, there is no subtype to build,
+         --  even if the underlying type is discriminated.
 
-         if In_Spec_Expression then
+         if Is_Private_Type (Typ) and then not Has_Discriminants (Typ) then
             return Typ;
 
-         elsif Is_Private_Type (Typ) and then not Has_Discriminants (Typ) then
+         --  If we are performing preanalysis on a conjured-up copy of a name
+         --  (see calls to Preanalyze_Range in sem_ch5.adb) then we don't want
+         --  to freeze Atyp, now or ever. In this case, the tree we eventually
+         --  pass to the back end should contain no references to Atyp (and a
+         --  freeze node would contain such a reference).
 
-            --  If the type has no discriminants, there is no subtype to
-            --  build, even if the underlying type is discriminated.
-
+         elsif not (Expander_Active or GNATprove_Mode) then
             return Typ;
 
          --  Else build the actual subtype
@@ -10086,42 +10090,21 @@ package body Sem_Util is
 
             Atyp := Defining_Identifier (Decl);
 
-            --  If Build_Actual_Subtype generated a new declaration then use it
+            --  The actual subtype is an Itype, so analyze the declaration
+            --  after attaching it to the tree, to get the type defined.
 
-            if Atyp /= Typ then
+            Set_Parent (Decl, N);
+            Set_Is_Itype (Atyp);
+            Analyze (Decl, Suppress => All_Checks);
+            Set_Associated_Node_For_Itype (Atyp, N);
 
-               --  The actual subtype is an Itype, so analyze the declaration,
-               --  but do not attach it to the tree, to get the type defined.
+            --  We need to freeze the actual subtype immediately. This is
+            --  needed because otherwise this Itype will not get frozen
+            --  at all; it is always safe to freeze on creation because
+            --  any associated types must be frozen at this point.
 
-               Set_Parent (Decl, N);
-               Set_Is_Itype (Atyp);
-               Analyze (Decl, Suppress => All_Checks);
-               Set_Associated_Node_For_Itype (Atyp, N);
-               if Expander_Active then
-                  Set_Has_Delayed_Freeze (Atyp, False);
-
-                  --  We need to freeze the actual subtype immediately. This is
-                  --  needed because otherwise this Itype will not get frozen
-                  --  at all; it is always safe to freeze on creation because
-                  --  any associated types must be frozen at this point.
-
-                  --  On the other hand, if we are performing preanalysis on
-                  --  a conjured-up copy of a name (see calls to
-                  --  Preanalyze_Range in sem_ch5.adb) then we don't want
-                  --  to freeze Atyp, now or ever. In this case, the tree
-                  --  we eventually pass to the back end should contain no
-                  --  references to Atyp (and a freeze node would contain
-                  --  such a reference). That's why Expander_Active is tested.
-
-                  Freeze_Itype (Atyp, N);
-               end if;
-               return Atyp;
-
-            --  Otherwise we did not build a declaration, so return original
-
-            else
-               return Typ;
-            end if;
+            Freeze_Itype (Atyp, N);
+            return Atyp;
          end if;
 
       --  For all remaining cases, the actual subtype is the same as
@@ -15035,6 +15018,7 @@ package body Sem_Util is
                | Aspect_Iterator_Element
                | Aspect_Max_Entry_Queue_Length
                | Aspect_No_Controlled_Parts
+               | Aspect_No_Task_Parts
             =>
                return;
          end case;
@@ -16294,8 +16278,9 @@ package body Sem_Util is
                  Names_Match (Assign_Indexed_1, Assign_Indexed_2);
             end;
 
-         --  Checking for this aspect is performed elsewhere during freezing
-         when Aspect_No_Controlled_Parts =>
+         --  Checking for these aspects is performed elsewhere during freezing
+         when Aspect_No_Controlled_Parts
+            | Aspect_No_Task_Parts =>
             return True;
 
          --  scalar-valued aspects; compare (static) values.
@@ -21390,6 +21375,18 @@ package body Sem_Util is
 
       return False;
    end Is_Unchecked_Conversion_Instance;
+
+   ---------------------------------
+   -- Is_Unchecked_Union_Equality --
+   ---------------------------------
+
+   function Is_Unchecked_Union_Equality (Id : Entity_Id) return Boolean is
+   begin
+      return Ekind (Id) = E_Function
+        and then Present (First_Formal (Id))
+        and then Is_Unchecked_Union (Etype (First_Formal (Id)))
+        and then Id = TSS (Etype (First_Formal (Id)), TSS_Composite_Equality);
+   end Is_Unchecked_Union_Equality;
 
    -------------------------------
    -- Is_Universal_Numeric_Type --
@@ -26972,6 +26969,10 @@ package body Sem_Util is
 
       if Has_Relaxed_Finalization (From_Typ) then
          Set_Has_Relaxed_Finalization (Typ);
+      end if;
+
+      if Deriv and then Has_Destructor (From_Typ) then
+         Set_Has_Destructor (Typ);
       end if;
    end Propagate_Controlled_Flags;
 
