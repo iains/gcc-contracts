@@ -346,22 +346,18 @@ enum contract_match_kind
   (DECL_DECLARES_FUNCTION_P (NODE) && DECL_LANG_SPECIFIC (NODE) && \
    DECL_CONTRACT_WRAPPER (NODE))
 
-extern void remove_contract_attributes		(tree);
-extern void copy_contract_attributes		(tree, tree);
-extern void remap_contracts			(tree, tree, tree, bool);
 extern void maybe_update_postconditions		(tree);
 extern void rebuild_postconditions		(tree);
 extern bool check_postcondition_result		(tree, tree, location_t);
 extern tree get_precondition_function		(tree);
 extern tree get_postcondition_function		(tree);
 extern tree get_contract_wrapper_function	(tree);
-extern void duplicate_contracts			(tree, tree);
+extern void check_redecl_contract		(tree, tree);
 extern void match_deferred_contracts		(tree);
 extern void defer_guarded_contract_match	(tree, tree, tree);
 extern bool diagnose_misapplied_contracts	(tree);
 extern tree finish_contract_attribute		(tree, tree);
 extern tree invalidate_contract			(tree);
-extern tree splice_out_contracts		(tree);
 extern bool all_attributes_are_contracts_p	(tree);
 extern tree copy_and_remap_contracts		(tree, tree, bool, contract_match_kind);
 extern void start_function_contracts		(tree);
@@ -370,5 +366,6 @@ extern void finish_function_contracts		(tree);
 extern void set_contract_functions		(tree, tree, tree);
 extern tree build_contract_check		(tree);
 extern void emit_assertion			(tree);
+extern void update_contract_arguments		(tree, tree);
 
 #endif /* ! GCC_CP_CONTRACT_H */
