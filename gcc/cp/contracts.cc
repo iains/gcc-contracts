@@ -2386,6 +2386,7 @@ get_p9600_contract_violation_fields ()
     detection_mode _M_detection_mode;
     const char* _M_comment;
     std::source_location _M_source_location;
+    void *_M_current_except_obj;
     __vendor_ext* _M_ext;
   };
     If this changes, also update the initializer in
@@ -2396,7 +2397,8 @@ get_p9600_contract_violation_fields ()
 			 uint16_type_node,
 			 const_string_type_node,
 			 get_contracts_source_location_type(),
-			 nullptr_type_node
+			 ptr_type_node,
+			 ptr_type_node
 			};
  const char *names[] = { "_M_version",
 			 "_M_assertion_kind",
@@ -2404,6 +2406,7 @@ get_p9600_contract_violation_fields ()
 			 "_M_detection_mode",
 			 "_M_comment",
 			 "_M_source_location",
+			 "_M_current_except_obj",
 			 "_M_ext",
 			};
   unsigned n = 0;
@@ -2491,14 +2494,15 @@ build_contract_violation_p2900 (tree contract, bool is_const)
 
   /* Must match the type layout in get_pseudo_contract_violation_type.  */
   tree ctor = build_constructor_va
-    (get_pseudo_contract_violation_type (), 7,
+    (get_pseudo_contract_violation_type (), 8,
      NULL_TREE, build_int_cst (uint16_type_node, version),
      NULL_TREE, build_int_cst (uint16_type_node, assertion_kind),
      NULL_TREE, build_int_cst (uint16_type_node, evaluation_semantic),
      NULL_TREE, build_int_cst (uint16_type_node, detection_mode),
      NULL_TREE, CONTRACT_COMMENT (contract),
      NULL_TREE, build_contracts_source_location (EXPR_LOCATION (contract)),
-     NULL_TREE, build_zero_cst (nullptr_type_node));  // __vendor_ext
+     NULL_TREE, build_zero_cst (nullptr_type_node),  // exception
+     NULL_TREE, build_zero_cst (nullptr_type_node)); // __vendor_ext
 
   TREE_READONLY (ctor) = true;
   TREE_CONSTANT (ctor) = true;
@@ -3544,6 +3548,47 @@ emit_contract_wrapper_func (bool done)
   return more;
 }
 
+static GTY(()) tree get_c_ex_o = NULL_TREE;
+
+static tree
+get__cxa_current_exception_obj_decl ()
+{
+  if (get_c_ex_o)
+    return get_c_ex_o;
+
+  auto module_kind_override = make_temp_override
+    (module_kind, module_kind & ~(MK_PURVIEW | MK_ATTACH | MK_EXPORTING));
+
+  tree fnname = get_identifier ("__cxa_current_exception_object");
+  if (!abi_node)
+    {
+      push_namespace (get_identifier ("__cxxabiv1"));
+      abi_node = current_namespace;
+      pop_namespace ();
+    }
+
+  tree l = lookup_qualified_name (abi_node, fnname,
+				  LOOK_want::HIDDEN_FRIEND);
+  for (tree f: lkp_range (l))
+    if (TREE_CODE (f) == FUNCTION_DECL)
+	{
+	  tree parms = TYPE_ARG_TYPES (TREE_TYPE (f));
+	  if (remaining_arguments (parms) != 0)
+	    continue;
+	  get_c_ex_o = f;
+	  return f;
+	}
+
+  tree fntype = build_function_type_list (ptr_type_node, NULL_TREE);
+  push_nested_namespace (abi_node);
+  tree fndecl
+    = build_library_fn_ptr ("__cxa_current_exception_object", fntype, ECF_NOTHROW);
+  pushdecl_namespace_level (fndecl, /*hiding*/true);
+  pop_nested_namespace (abi_node);
+  get_c_ex_o = fndecl;
+  return fndecl;
+}
+
 void
 maybe_emit_violation_handler_wrappers ()
 {
@@ -3629,6 +3674,14 @@ maybe_emit_violation_handler_wrappers ()
    (loc, r, NOP_EXPR,
     build_int_cst (uint16_type_node, (uint16_t)CDM_EVAL_EXCEPTION),
     tf_warning_or_error);
+  finish_expr_stmt (r);
+  memb = lookup_member (a_type, get_identifier ("_M_current_except_obj"),
+		     /*protect=*/1, /*want_type=*/0, tf_warning_or_error);
+  r = build_class_member_access_expr (v2, memb, NULL_TREE, false,
+				      tf_warning_or_error);
+  tree call = get__cxa_current_exception_obj_decl ();
+  call = build_call_n (call, 0);
+  r = cp_build_modify_expr (loc, r, NOP_EXPR, call, tf_warning_or_error);
   finish_expr_stmt (r);
   finish_expr_stmt (build_call_n (__tu_has_violation, 2, build_address (v2), semantic));
   finish_return_stmt (NULL_TREE);
