@@ -430,6 +430,7 @@ static const struct aarch64_flag_desc aarch64_tuning_flags[] =
 #include "tuning_models/neoversev2.h"
 #include "tuning_models/neoversev3.h"
 #include "tuning_models/neoversev3ae.h"
+#include "tuning_models/olympus.h"
 #include "tuning_models/a64fx.h"
 #include "tuning_models/fujitsu_monaka.h"
 
@@ -3930,6 +3931,33 @@ aarch64_sve_fp_pred (machine_mode data_mode, rtx *strictness)
      *strictness = gen_int_mode (SVE_RELAXED_GP, SImode);
    /* Use the VPRED mode.  */
    return aarch64_ptrue_reg (aarch64_sve_pred_mode (data_mode));
+}
+
+/* PRED is a predicate that governs an operation on DATA_MODE.  If DATA_MODE
+   is a partial vector mode, and if exceptions must be suppressed for its
+   undefined elements, convert PRED from a container-level predicate to
+   an element-level predicate and ensure that the undefined elements
+   are inactive.  Make no changes otherwise.
+
+   Return the resultant predicate.  */
+rtx
+aarch64_sve_emit_masked_fp_pred (machine_mode data_mode, rtx pred)
+{
+  unsigned int vec_flags = aarch64_classify_vector_mode (data_mode);
+  if (flag_trapping_math && (vec_flags & VEC_PARTIAL))
+    {
+      /* Generate an element-level mask.  */
+      rtx mask = aarch64_sve_packed_pred (data_mode);
+      machine_mode pmode = GET_MODE (mask);
+
+      /* Apply the existing predicate.  */
+      rtx dst = gen_reg_rtx (pmode);
+      emit_insn (gen_and3 (pmode, dst, mask,
+			   gen_lowpart (pmode, pred)));
+      return dst;
+    }
+
+  return pred;
 }
 
 /* Emit a comparison CMP between OP0 and OP1, both of which have mode
@@ -17165,8 +17193,8 @@ aarch64_ld234_st234_vectors (vect_cost_for_stmt kind, stmt_vec_info stmt_info,
       && STMT_VINFO_DATA_REF (stmt_info))
     {
       stmt_info = DR_GROUP_FIRST_ELEMENT (stmt_info);
-      if (stmt_info
-	  && vect_mem_access_type (stmt_info, node) == VMAT_LOAD_STORE_LANES)
+      if (node
+	  && SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_LOAD_STORE_LANES)
 	return DR_GROUP_SIZE (stmt_info);
     }
   return 0;
@@ -17437,8 +17465,9 @@ aarch64_detect_vector_stmt_subtype (vec_info *vinfo, vect_cost_for_stmt kind,
      for each element.  We therefore need to divide the full-instruction
      cost by the number of elements in the vector.  */
   if (kind == scalar_load
+      && node
       && sve_costs
-      && vect_mem_access_type (stmt_info, node) == VMAT_GATHER_SCATTER)
+      && SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_GATHER_SCATTER)
     {
       unsigned int nunits = vect_nunits_for_cost (vectype);
       /* Test for VNx2 modes, which have 64-bit containers.  */
@@ -17450,8 +17479,9 @@ aarch64_detect_vector_stmt_subtype (vec_info *vinfo, vect_cost_for_stmt kind,
   /* Detect cases in which a scalar_store is really storing one element
      in a scatter operation.  */
   if (kind == scalar_store
+      && node
       && sve_costs
-      && vect_mem_access_type (stmt_info, node) == VMAT_GATHER_SCATTER)
+      && SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_GATHER_SCATTER)
     return sve_costs->scatter_store_elt_cost;
 
   /* Detect cases in which vec_to_scalar represents an in-loop reduction.  */
@@ -17707,7 +17737,7 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
   if (stmt_info
       && kind == vec_to_scalar
       && (m_vec_flags & VEC_ADVSIMD)
-      && vect_mem_access_type (stmt_info, node) == VMAT_GATHER_SCATTER)
+      && SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_GATHER_SCATTER)
     {
       auto dr = STMT_VINFO_DATA_REF (stmt_info);
       tree dr_ref = DR_REF (dr);
@@ -17720,7 +17750,7 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
 		{
 		  if (gimple_vuse (SSA_NAME_DEF_STMT (offset)))
 		    {
-		      if (STMT_VINFO_TYPE (stmt_info) == load_vec_info_type)
+		      if (SLP_TREE_TYPE (node) == load_vec_info_type)
 			ops->loads += count - 1;
 		      else
 			  /* Stores want to count both the index to array and data to
@@ -17822,7 +17852,7 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
   if (stmt_info
       && sve_issue
       && (kind == scalar_load || kind == scalar_store)
-      && vect_mem_access_type (stmt_info, node) == VMAT_GATHER_SCATTER)
+      && SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_GATHER_SCATTER)
     {
       unsigned int pairs = CEIL (count, 2);
       ops->pred_ops += sve_issue->gather_scatter_pair_pred_ops * pairs;
@@ -17977,9 +18007,10 @@ aarch64_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 
       /* Check if we've seen an SVE gather/scatter operation and which size.  */
       if (kind == scalar_load
+	  && node
 	  && vectype
 	  && aarch64_sve_mode_p (TYPE_MODE (vectype))
-	  && vect_mem_access_type (stmt_info, node) == VMAT_GATHER_SCATTER)
+	  && SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_GATHER_SCATTER)
 	{
 	  const sve_vec_cost *sve_costs = aarch64_tune_params.vec_costs->sve;
 	  if (sve_costs)
@@ -20481,6 +20512,8 @@ aarch64_compare_version_priority (tree decl1, tree decl2)
      unsigned long _size; // Size of the struct, so it can grow.
      unsigned long _hwcap;
      unsigned long _hwcap2;
+     unsigned long _hwcap3;
+     unsigned long _hwcap4;
    }
  */
 
@@ -20497,14 +20530,24 @@ build_ifunc_arg_type ()
   tree field3 = build_decl (UNKNOWN_LOCATION, FIELD_DECL,
 			    get_identifier ("_hwcap2"),
 			    long_unsigned_type_node);
+  tree field4 = build_decl (UNKNOWN_LOCATION, FIELD_DECL,
+			    get_identifier ("_hwcap3"),
+			    long_unsigned_type_node);
+  tree field5 = build_decl (UNKNOWN_LOCATION, FIELD_DECL,
+			    get_identifier ("_hwcap4"),
+			    long_unsigned_type_node);
 
   DECL_FIELD_CONTEXT (field1) = ifunc_arg_type;
   DECL_FIELD_CONTEXT (field2) = ifunc_arg_type;
   DECL_FIELD_CONTEXT (field3) = ifunc_arg_type;
+  DECL_FIELD_CONTEXT (field4) = ifunc_arg_type;
+  DECL_FIELD_CONTEXT (field5) = ifunc_arg_type;
 
   TYPE_FIELDS (ifunc_arg_type) = field1;
   DECL_CHAIN (field1) = field2;
   DECL_CHAIN (field2) = field3;
+  DECL_CHAIN (field3) = field4;
+  DECL_CHAIN (field4) = field5;
 
   layout_type (ifunc_arg_type);
 
@@ -31963,9 +32006,43 @@ aarch64_test_sysreg_encoding_clashes (void)
 static void
 aarch64_test_sve_folding ()
 {
+  aarch64_target_switcher switcher (AARCH64_FL_SVE);
+
   tree res = fold_unary (BIT_NOT_EXPR, ssizetype,
 			 ssize_int (poly_int64 (1, 1)));
   ASSERT_TRUE (operand_equal_p (res, ssize_int (poly_int64 (-2, -1))));
+
+  auto build_v16bi = [](bool a, bool b)
+    {
+      rtx_vector_builder builder (VNx16BImode, 2, 1);
+      builder.quick_push (a ? const1_rtx : const0_rtx);
+      builder.quick_push (b ? const1_rtx : const0_rtx);
+      return builder.build ();
+    };
+  rtx v16bi_10 = build_v16bi (1, 0);
+  rtx v16bi_01 = build_v16bi (0, 1);
+
+  for (auto mode : { VNx8BImode, VNx4BImode, VNx2BImode })
+    {
+      rtx reg = gen_rtx_REG (mode, LAST_VIRTUAL_REGISTER + 1);
+      rtx subreg = lowpart_subreg (VNx16BImode, reg, mode);
+      rtx and1 = simplify_gen_binary (AND, VNx16BImode, subreg, v16bi_10);
+      ASSERT_EQ (lowpart_subreg (mode, and1, VNx16BImode), reg);
+      rtx and0 = simplify_gen_binary (AND, VNx16BImode, subreg, v16bi_01);
+      ASSERT_EQ (lowpart_subreg (mode, and0, VNx16BImode), CONST0_RTX (mode));
+
+      rtx ior1 = simplify_gen_binary (IOR, VNx16BImode, subreg, v16bi_10);
+      ASSERT_EQ (lowpart_subreg (mode, ior1, VNx16BImode), CONSTM1_RTX (mode));
+      rtx ior0 = simplify_gen_binary (IOR, VNx16BImode, subreg, v16bi_01);
+      ASSERT_EQ (lowpart_subreg (mode, ior0, VNx16BImode), reg);
+
+      rtx xor1 = simplify_gen_binary (XOR, VNx16BImode, subreg, v16bi_10);
+      ASSERT_RTX_EQ (lowpart_subreg (mode, xor1, VNx16BImode),
+		     lowpart_subreg (mode, gen_rtx_NOT (VNx16BImode, subreg),
+				     VNx16BImode));
+      rtx xor0 = simplify_gen_binary (XOR, VNx16BImode, subreg, v16bi_01);
+      ASSERT_EQ (lowpart_subreg (mode, xor0, VNx16BImode), reg);
+    }
 }
 
 /* Run all target-specific selftests.  */

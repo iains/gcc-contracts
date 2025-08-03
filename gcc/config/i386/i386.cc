@@ -12442,6 +12442,28 @@ static GTY(()) rtx ix86_tls_symbol;
 static rtx
 ix86_tls_get_addr (void)
 {
+  if (cfun->machine->call_saved_registers
+      == TYPE_NO_CALLER_SAVED_REGISTERS)
+    {
+      /* __tls_get_addr doesn't preserve vector registers.  When a
+	 function with no_caller_saved_registers attribute calls
+	 __tls_get_addr, YMM and ZMM registers will be clobbered.
+	 Issue an error and suggest -mtls-dialect=gnu2 in this case.  */
+      if (cfun->machine->func_type == TYPE_NORMAL)
+	error (G_("%<-mtls-dialect=gnu2%> must be used with a function"
+		  " with the %<no_caller_saved_registers%> attribute"));
+      else
+	error (cfun->machine->func_type == TYPE_EXCEPTION
+	       ? G_("%<-mtls-dialect=gnu2%> must be used with an"
+		    " exception service routine")
+	       : G_("%<-mtls-dialect=gnu2%> must be used with an"
+		    " interrupt service routine"));
+      /* Don't issue the same error twice.  */
+      cfun->machine->func_type = TYPE_NORMAL;
+      cfun->machine->call_saved_registers
+	= TYPE_DEFAULT_CALL_SAVED_REGISTERS;
+    }
+
   if (!ix86_tls_symbol)
     {
       const char *sym
@@ -20007,7 +20029,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
 	tree utype, ures, vce;
 	utype = unsigned_type_for (TREE_TYPE (arg0));
 	/* PABSB/W/D/Q store the unsigned result in dst, use ABSU_EXPR
-	   instead of ABS_EXPR to hanlde overflow case(TYPE_MIN).  */
+	   instead of ABS_EXPR to handle overflow case(TYPE_MIN).  */
 	ures = gimple_build (&stmts, ABSU_EXPR, utype, arg0);
 	gsi_insert_seq_before (gsi, stmts, GSI_SAME_STMT);
 	loc = gimple_location (stmt);
@@ -21491,8 +21513,7 @@ ix86_hard_regno_nregs (unsigned int regno, machine_mode mode)
   /* Register pair for mask registers.  */
   if (mode == P2QImode || mode == P2HImode)
     return 2;
-  if (mode == V64SFmode || mode == V64SImode)
-    return 4;
+
   return 1;
 }
 
@@ -23132,7 +23153,7 @@ ix86_rtx_costs (rtx x, machine_mode mode, int outer_code_i, int opno,
 	     So current solution is make constant disp as cheap as possible.  */
 	  if (GET_CODE (addr) == PLUS
 	      && x86_64_immediate_operand (XEXP (addr, 1), Pmode)
-	      /* Only hanlde (reg + disp) since other forms of addr are mostly LEA,
+	      /* Only handle (reg + disp) since other forms of addr are mostly LEA,
 		 there's no additional cost for the plus of disp.  */
 	      && register_operand (XEXP (addr, 0), Pmode))
 	    {
@@ -25211,20 +25232,14 @@ asm_preferred_eh_data_format (int code, int global)
   return DW_EH_PE_absptr;
 }
 
-/* Implement targetm.vectorize.builtin_vectorization_cost.  */
+/* Worker for ix86_builtin_vectorization_cost and the fallback calls
+   from ix86_vector_costs::add_stmt_cost.  */
 static int
-ix86_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
-                                 tree vectype, int)
+ix86_default_vector_cost (enum vect_cost_for_stmt type_of_cost,
+			  machine_mode mode)
 {
-  bool fp = false;
-  machine_mode mode = TImode;
+  bool fp = FLOAT_MODE_P (mode);
   int index;
-  if (vectype != NULL)
-    {
-      fp = FLOAT_TYPE_P (vectype);
-      mode = TYPE_MODE (vectype);
-    }
-
   switch (type_of_cost)
     {
       case scalar_stmt:
@@ -25283,14 +25298,14 @@ ix86_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
 			      COSTS_N_INSNS
 				 (ix86_cost->gather_static
 				  + ix86_cost->gather_per_elt
-				    * TYPE_VECTOR_SUBPARTS (vectype)) / 2);
+				    * GET_MODE_NUNITS (mode)) / 2);
 
       case vector_scatter_store:
         return ix86_vec_cost (mode,
 			      COSTS_N_INSNS
 				 (ix86_cost->scatter_static
 				  + ix86_cost->scatter_per_elt
-				    * TYPE_VECTOR_SUBPARTS (vectype)) / 2);
+				    * GET_MODE_NUNITS (mode)) / 2);
 
       case cond_branch_taken:
         return ix86_cost->cond_taken_branch_cost;
@@ -25308,7 +25323,7 @@ ix86_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
 
       case vec_construct:
 	{
-	  int n = TYPE_VECTOR_SUBPARTS (vectype);
+	  int n = GET_MODE_NUNITS (mode);
 	  /* N - 1 element inserts into an SSE vector, the possible
 	     GPR -> XMM move is accounted for in add_stmt_cost.  */
 	  if (GET_MODE_BITSIZE (mode) <= 128)
@@ -25334,6 +25349,17 @@ ix86_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
       default:
         gcc_unreachable ();
     }
+}
+
+/* Implement targetm.vectorize.builtin_vectorization_cost.  */
+static int
+ix86_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
+				 tree vectype, int)
+{
+  machine_mode mode = TImode;
+  if (vectype != NULL)
+    mode = TYPE_MODE (vectype);
+  return ix86_default_vector_cost (type_of_cost, mode);
 }
 
 
@@ -25789,7 +25815,7 @@ ix86_vectorize_create_costs (vec_info *vinfo, bool costing_for_scalar)
 unsigned
 ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 				  stmt_vec_info stmt_info, slp_tree node,
-				  tree vectype, int misalign,
+				  tree vectype, int,
 				  vect_cost_model_location where)
 {
   unsigned retval = 0;
@@ -26128,32 +26154,24 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
      (AGU and load ports).  Try to account for this by scaling the
      construction cost by the number of elements involved.  */
   if ((kind == vec_construct || kind == vec_to_scalar)
-      && ((stmt_info
-	   && (STMT_VINFO_TYPE (stmt_info) == load_vec_info_type
-	       || STMT_VINFO_TYPE (stmt_info) == store_vec_info_type)
-	   && ((STMT_VINFO_MEMORY_ACCESS_TYPE (stmt_info) == VMAT_ELEMENTWISE
-		&& (TREE_CODE (DR_STEP (STMT_VINFO_DATA_REF (stmt_info)))
+      && ((node
+	   && (((SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_ELEMENTWISE
+		 || (SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_STRIDED_SLP
+		     && SLP_TREE_LANES (node) == 1))
+		&& (TREE_CODE (DR_STEP (STMT_VINFO_DATA_REF
+					(SLP_TREE_REPRESENTATIVE (node))))
 		    != INTEGER_CST))
-	       || (STMT_VINFO_MEMORY_ACCESS_TYPE (stmt_info)
-		   == VMAT_GATHER_SCATTER)))
-	  || (node
-	      && (((SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_ELEMENTWISE
-		    || (SLP_TREE_MEMORY_ACCESS_TYPE (node) == VMAT_STRIDED_SLP
-			&& SLP_TREE_LANES (node) == 1))
-		   && (TREE_CODE (DR_STEP (STMT_VINFO_DATA_REF
-					     (SLP_TREE_REPRESENTATIVE (node))))
-		      != INTEGER_CST))
-		  || (SLP_TREE_MEMORY_ACCESS_TYPE (node)
-		      == VMAT_GATHER_SCATTER)))))
+	       || (SLP_TREE_MEMORY_ACCESS_TYPE (node)
+		   == VMAT_GATHER_SCATTER)))))
     {
-      stmt_cost = ix86_builtin_vectorization_cost (kind, vectype, misalign);
+      stmt_cost = ix86_default_vector_cost (kind, mode);
       stmt_cost *= (TYPE_VECTOR_SUBPARTS (vectype) + 1);
     }
   else if ((kind == vec_construct || kind == scalar_to_vec)
 	   && node
 	   && SLP_TREE_DEF_TYPE (node) == vect_external_def)
     {
-      stmt_cost = ix86_builtin_vectorization_cost (kind, vectype, misalign);
+      stmt_cost = ix86_default_vector_cost (kind, mode);
       unsigned i;
       tree op;
       FOR_EACH_VEC_ELT (SLP_TREE_SCALAR_OPS (node), i, op)
@@ -26217,7 +26235,7 @@ ix86_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 	  TREE_VISITED (op) = 0;
     }
   if (stmt_cost == -1)
-    stmt_cost = ix86_builtin_vectorization_cost (kind, vectype, misalign);
+    stmt_cost = ix86_default_vector_cost (kind, mode);
 
   if (kind == vec_perm && vectype
       && GET_MODE_SIZE (TYPE_MODE (vectype)) == 32)

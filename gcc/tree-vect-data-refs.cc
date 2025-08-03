@@ -2918,12 +2918,14 @@ vect_enhance_data_refs_alignment (loop_vec_info loop_vinfo)
      2) there is at least one unsupported misaligned data ref with an unknown
         misalignment, and
      3) all misaligned data refs with a known misalignment are supported, and
-     4) the number of runtime alignment checks is within reason.  */
+     4) the number of runtime alignment checks is within reason.
+     5) the vectorization factor is a constant.  */
 
   do_versioning
     = (optimize_loop_nest_for_speed_p (loop)
        && !loop->inner /* FORNOW */
-       && loop_cost_model (loop) > VECT_COST_MODEL_CHEAP);
+       && loop_cost_model (loop) > VECT_COST_MODEL_CHEAP)
+       && LOOP_VINFO_VECT_FACTOR (loop_vinfo).is_constant ();
 
   if (do_versioning)
     {
@@ -2964,17 +2966,6 @@ vect_enhance_data_refs_alignment (loop_vec_info loop_vinfo)
                   break;
                 }
 
-	      /* At present we don't support versioning for alignment
-		 with variable VF, since there's no guarantee that the
-		 VF is a power of two.  We could relax this if we added
-		 a way of enforcing a power-of-two size.  */
-	      unsigned HOST_WIDE_INT size;
-	      if (!GET_MODE_SIZE (TYPE_MODE (vectype)).is_constant (&size))
-		{
-		  do_versioning = false;
-		  break;
-		}
-
 	      /* Forcing alignment in the first iteration is no good if
 		 we don't keep it across iterations.  For now, just disable
 		 versioning in this case.
@@ -2993,7 +2984,8 @@ vect_enhance_data_refs_alignment (loop_vec_info loop_vinfo)
                  Construct the mask needed for this test.  For example,
                  GET_MODE_SIZE for the vector mode V4SI is 16 bytes so the
                  mask must be 15 = 0xf. */
-	      int mask = size - 1;
+	      gcc_assert (DR_TARGET_ALIGNMENT (dr_info).is_constant ());
+	      int mask = DR_TARGET_ALIGNMENT (dr_info).to_constant () - 1;
 
 	      /* FORNOW: use the same mask to test all potentially unaligned
 		 references in the loop.  */
@@ -4542,7 +4534,6 @@ vect_describe_gather_scatter_call (stmt_vec_info stmt_info,
 		     (call, internal_fn_alias_ptr_index (info->ifn));
   info->offset = gimple_call_arg
 		  (call, internal_fn_offset_index (info->ifn));
-  info->offset_dt = vect_unknown_def_type;
   info->offset_vectype = NULL_TREE;
   info->scale = TREE_INT_CST_LOW (gimple_call_arg
 				  (call, internal_fn_scale_index (info->ifn)));
@@ -4872,7 +4863,6 @@ vect_check_gather_scatter (stmt_vec_info stmt_info, loop_vec_info loop_vinfo,
      get_object_alignment (DR_REF (dr)));
 
   info->offset = off;
-  info->offset_dt = vect_unknown_def_type;
   info->offset_vectype = offset_vectype;
   info->scale = scale;
   info->element_type = TREE_TYPE (vectype);

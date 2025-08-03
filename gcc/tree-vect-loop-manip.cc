@@ -2857,7 +2857,7 @@ vect_gen_vector_loop_niters (loop_vec_info loop_vinfo, tree niters,
 	 we set range information to make niters analyzer's life easier.
 	 Note the number of latch iteration value can be TYPE_MAX_VALUE so
 	 we have to represent the vector niter TYPE_MAX_VALUE + 1 / vf.  */
-      if (stmts != NULL && const_vf > 0)
+      if (stmts != NULL && const_vf > 0 && !LOOP_VINFO_EPILOGUE_P (loop_vinfo))
 	{
 	  if (niters_no_overflow
 	      && LOOP_VINFO_USING_PARTIAL_VECTORS_P (loop_vinfo))
@@ -3295,7 +3295,7 @@ vect_do_peeling (loop_vec_info loop_vinfo, tree niters, tree nitersm1,
   bool skip_vector = (LOOP_VINFO_NITERS_KNOWN_P (loop_vinfo)
 		      ? maybe_lt (LOOP_VINFO_INT_NITERS (loop_vinfo),
 				  bound_prolog + bound_epilog)
-		      : (!LOOP_REQUIRES_VERSIONING_FOR_ALIGNMENT (loop_vinfo)
+		      : (!LOOP_VINFO_USE_VERSIONING_WITHOUT_PEELING (loop_vinfo)
 			 || vect_epilogues));
 
   /* Epilog loop must be executed if the number of iterations for epilog

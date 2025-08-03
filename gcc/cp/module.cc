@@ -6158,7 +6158,7 @@ trees_out::lang_type_bools (tree t, bits_out& bits)
   WB (lang->declared_class);
   WB (lang->diamond_shaped);
   WB (lang->repeated_base);
-  gcc_assert (!lang->being_defined);
+  gcc_checking_assert (!lang->being_defined);
   // lang->debug_requested
   WB (lang->fields_readonly);
   WB (lang->ptrmemfunc_flag);
@@ -6184,6 +6184,14 @@ trees_out::lang_type_bools (tree t, bits_out& bits)
   WB (lang->has_constexpr_ctor);
   WB (lang->unique_obj_representations);
   WB (lang->unique_obj_representations_set);
+  gcc_checking_assert (!lang->erroneous);
+  WB (lang->non_pod_aggregate);
+  WB (lang->non_aggregate_pod);
+  WB (lang->trivially_relocatable);
+  WB (lang->trivially_relocatable_computed);
+
+  WB (lang->replaceable);
+  WB (lang->replaceable_computed);
 #undef WB
 }
 
@@ -6228,8 +6236,8 @@ trees_in::lang_type_bools (tree t, bits_in& bits)
   RB (lang->declared_class);
   RB (lang->diamond_shaped);
   RB (lang->repeated_base);
-  gcc_assert (!lang->being_defined);
-  gcc_assert (!lang->debug_requested);
+  gcc_checking_assert (!lang->being_defined);
+  gcc_checking_assert (!lang->debug_requested);
   RB (lang->fields_readonly);
   RB (lang->ptrmemfunc_flag);
 
@@ -6254,6 +6262,14 @@ trees_in::lang_type_bools (tree t, bits_in& bits)
   RB (lang->has_constexpr_ctor);
   RB (lang->unique_obj_representations);
   RB (lang->unique_obj_representations_set);
+  gcc_checking_assert (!lang->erroneous);
+  RB (lang->non_pod_aggregate);
+  RB (lang->non_aggregate_pod);
+  RB (lang->trivially_relocatable);
+  RB (lang->trivially_relocatable_computed);
+
+  RB (lang->replaceable);
+  RB (lang->replaceable_computed);
 #undef RB
   return !get_overrun ();
 }
@@ -6544,8 +6560,14 @@ trees_out::core_vals (tree t)
 	}
 
       WT (t->function_decl.personality);
-      WT (t->function_decl.function_specific_target);
-      WT (t->function_decl.function_specific_optimization);
+      /* Rather than streaming target/optimize nodes, we should reconstruct
+	 them on stream-in from any attributes applied to the function.  */
+      if (streaming_p () && t->function_decl.function_specific_target)
+	warning_at (DECL_SOURCE_LOCATION (t), 0,
+		    "%<target%> attribute currently unsupported in modules");
+      if (streaming_p () && t->function_decl.function_specific_optimization)
+	warning_at (DECL_SOURCE_LOCATION (t), 0,
+		    "%<optimize%> attribute currently unsupported in modules");
       WT (t->function_decl.vindex);
 
       if (DECL_HAS_DEPENDENT_EXPLICIT_SPEC_P (t))
@@ -6635,11 +6657,12 @@ trees_out::core_vals (tree t)
     case TARGET_OPTION_NODE:
       // FIXME: Our representation for these two nodes is a cache of
       // the resulting set of options.  Not a record of the options
-      // that got changed by a particular attribute or pragma.  Should
-      // we record that, or should we record the diff from the command
-      // line options?  The latter seems the right behaviour, but is
-      // (a) harder, and I guess could introduce strangeness if the
-      // importer has set some incompatible set of optimization flags?
+      // that got changed by a particular attribute or pragma.  Instead
+      // of recording that, we probably should just rebuild the options
+      // on stream-in from the function attributes.  This could introduce
+      // strangeness if the importer has some incompatible set of flags
+      // but we currently assume users "know what they're doing" in such
+      // a case anyway.
       gcc_unreachable ();
       break;
 
@@ -7098,8 +7121,10 @@ trees_in::core_vals (tree t)
 	  }
 
 	RT (t->function_decl.personality);
-	RT (t->function_decl.function_specific_target);
-	RT (t->function_decl.function_specific_optimization);
+	/* These properties are not streamed, and should be reconstructed
+	   from any function attributes.  */
+	// t->function_decl.function_specific_target);
+	// t->function_decl.function_specific_optimization);
 	RT (t->function_decl.vindex);
 
 	if (DECL_HAS_DEPENDENT_EXPLICIT_SPEC_P (t))
@@ -7205,7 +7230,7 @@ trees_in::core_vals (tree t)
 
     case OPTIMIZATION_NODE:
     case TARGET_OPTION_NODE:
-      /* Not yet implemented, see trees_out::core_vals.  */
+      /* Not implemented, see trees_out::core_vals.  */
       gcc_unreachable ();
       break;
 
@@ -11148,6 +11173,20 @@ trees_in::fn_parms_fini (int tag, tree fn, tree existing, bool is_defn)
 		 names of the parms from us.  */
 	      DECL_NAME (existing_parm) = DECL_NAME (parm);
 	      DECL_SOURCE_LOCATION (existing_parm) = DECL_SOURCE_LOCATION (parm);
+
+	      /* And some other flags important for codegen are only set
+		 by the definition.  */
+	      TREE_ADDRESSABLE (existing_parm) = TREE_ADDRESSABLE (parm);
+	      DECL_BY_REFERENCE (existing_parm) = DECL_BY_REFERENCE (parm);
+	      DECL_NONLOCAL (existing_parm) = DECL_NONLOCAL (parm);
+	      DECL_ARG_TYPE (existing_parm) = DECL_ARG_TYPE (parm);
+
+	      /* Invisiref parms had their types adjusted by cp_genericize. */
+	      if (DECL_BY_REFERENCE (parm))
+		{
+		  TREE_TYPE (existing_parm) = TREE_TYPE (parm);
+		  relayout_decl (existing_parm);
+		}
 	    }
 
 	  back_refs[~tag] = existing_parm;

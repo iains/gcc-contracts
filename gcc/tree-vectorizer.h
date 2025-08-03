@@ -173,6 +173,8 @@ struct vect_scalar_ops_slice_hash : typed_noop_remove<vect_scalar_ops_slice>
 /* Describes how we're going to vectorize an individual load or store,
    or a group of loads or stores.  */
 enum vect_memory_access_type {
+  VMAT_UNINITIALIZED,
+
   /* An access to an invariant address.  This is used only for loads.  */
   VMAT_INVARIANT,
 
@@ -205,6 +207,32 @@ enum vect_memory_access_type {
   VMAT_GATHER_SCATTER
 };
 
+/*-----------------------------------------------------------------*/
+/* Info on vectorized defs.                                        */
+/*-----------------------------------------------------------------*/
+enum stmt_vec_info_type {
+  undef_vec_info_type = 0,
+  load_vec_info_type,
+  store_vec_info_type,
+  shift_vec_info_type,
+  op_vec_info_type,
+  call_vec_info_type,
+  call_simd_clone_vec_info_type,
+  assignment_vec_info_type,
+  condition_vec_info_type,
+  comparison_vec_info_type,
+  reduc_vec_info_type,
+  induc_vec_info_type,
+  type_promotion_vec_info_type,
+  type_demotion_vec_info_type,
+  type_conversion_vec_info_type,
+  cycle_phi_info_type,
+  lc_phi_info_type,
+  phi_info_type,
+  recurr_info_type,
+  loop_exit_ctrl_vec_info_type
+};
+
 /************************************************************************
   SLP
  ************************************************************************/
@@ -212,6 +240,23 @@ typedef vec<std::pair<unsigned, unsigned> > lane_permutation_t;
 typedef auto_vec<std::pair<unsigned, unsigned>, 16> auto_lane_permutation_t;
 typedef vec<unsigned> load_permutation_t;
 typedef auto_vec<unsigned, 16> auto_load_permutation_t;
+
+struct vect_data {
+  virtual ~vect_data () = default;
+};
+
+/* Analysis data from vectorizable_simd_clone_call for
+   call_simd_clone_vec_info_type.  */
+struct vect_simd_clone_data : vect_data {
+  virtual ~vect_simd_clone_data () = default;
+  vect_simd_clone_data () = default;
+  vect_simd_clone_data (vect_simd_clone_data &&other) = default;
+
+  /* Selected SIMD clone's function info.  First vector element
+     is SIMD clone's function decl, followed by a pair of trees (base + step)
+     for linear arguments (pair of NULLs for other arguments).  */
+  auto_vec<tree> simd_clone_info;
+};
 
 /* A computation tree of an SLP instance.  Each node corresponds to a group of
    stmts to be packed in a SIMD stmt.  */
@@ -240,11 +285,6 @@ struct _slp_tree {
      of { operand number, lane number }.  The number of elements
      denotes the number of output lanes.  */
   lane_permutation_t lane_permutation;
-
-  /* Selected SIMD clone's function info.  First vector element
-     is SIMD clone's function decl, followed by a pair of trees (base + step)
-     for linear arguments (pair of NULLs for other arguments).  */
-  vec<tree> simd_clone_info;
 
   tree vectype;
   /* Vectorized defs.  */
@@ -278,6 +318,14 @@ struct _slp_tree {
   /* Classifies how the load or store is going to be implemented
      for loop vectorization.  */
   vect_memory_access_type memory_access_type;
+
+  /* The kind of operation as determined by analysis and optional
+     kind specific data.  */
+  enum stmt_vec_info_type type;
+  vect_data *data;
+
+  template <class T>
+  T& get_data (T& else_) { return data ? *static_cast <T *> (data) : else_; }
 
   /* If not NULL this is a cached failed SLP discovery attempt with
      the lanes that failed during SLP discovery as 'false'.  This is
@@ -357,13 +405,13 @@ public:
 #define SLP_TREE_NUMBER_OF_VEC_STMTS(S)          (S)->vec_stmts_size
 #define SLP_TREE_LOAD_PERMUTATION(S)             (S)->load_permutation
 #define SLP_TREE_LANE_PERMUTATION(S)             (S)->lane_permutation
-#define SLP_TREE_SIMD_CLONE_INFO(S)              (S)->simd_clone_info
 #define SLP_TREE_DEF_TYPE(S)			 (S)->def_type
 #define SLP_TREE_VECTYPE(S)			 (S)->vectype
 #define SLP_TREE_REPRESENTATIVE(S)		 (S)->representative
 #define SLP_TREE_LANES(S)			 (S)->lanes
 #define SLP_TREE_CODE(S)			 (S)->code
 #define SLP_TREE_MEMORY_ACCESS_TYPE(S)		 (S)->memory_access_type
+#define SLP_TREE_TYPE(S)			 (S)->type
 
 enum vect_partial_vector_style {
     vect_partial_vectors_none,
@@ -1163,6 +1211,10 @@ public:
    || LOOP_REQUIRES_VERSIONING_FOR_NITERS (L)		\
    || LOOP_REQUIRES_VERSIONING_FOR_SIMD_IF_COND (L))
 
+#define LOOP_VINFO_USE_VERSIONING_WITHOUT_PEELING(L)	\
+  ((L)->may_misalign_stmts.length () > 0		\
+   && !LOOP_VINFO_ALLOW_MUTUAL_ALIGNMENT (L))
+
 #define LOOP_VINFO_NITERS_KNOWN_P(L)          \
   (tree_fits_shwi_p ((L)->num_iters) && tree_to_shwi ((L)->num_iters) > 0)
 
@@ -1210,32 +1262,6 @@ public:
 #define BB_VINFO_SLP_INSTANCES(B)    (B)->slp_instances
 #define BB_VINFO_DATAREFS(B)         (B)->shared->datarefs
 #define BB_VINFO_DDRS(B)             (B)->shared->ddrs
-
-/*-----------------------------------------------------------------*/
-/* Info on vectorized defs.                                        */
-/*-----------------------------------------------------------------*/
-enum stmt_vec_info_type {
-  undef_vec_info_type = 0,
-  load_vec_info_type,
-  store_vec_info_type,
-  shift_vec_info_type,
-  op_vec_info_type,
-  call_vec_info_type,
-  call_simd_clone_vec_info_type,
-  assignment_vec_info_type,
-  condition_vec_info_type,
-  comparison_vec_info_type,
-  reduc_vec_info_type,
-  induc_vec_info_type,
-  type_promotion_vec_info_type,
-  type_demotion_vec_info_type,
-  type_conversion_vec_info_type,
-  cycle_phi_info_type,
-  lc_phi_info_type,
-  phi_info_type,
-  recurr_info_type,
-  loop_exit_ctrl_vec_info_type
-};
 
 /* Indicates whether/how a variable is used in the scope of loop/basic
    block.  */
@@ -1328,8 +1354,6 @@ typedef struct data_reference *dr_p;
 
 class _stmt_vec_info {
 public:
-
-  enum stmt_vec_info_type type;
 
   /* Indicates whether this stmts is part of a computation whose result is
      used outside the loop.  */
@@ -1427,10 +1451,6 @@ public:
 
   /* For both loads and stores.  */
   unsigned simd_lane_access_p : 3;
-
-  /* Classifies how the load or store is going to be implemented
-     for loop vectorization.  */
-  vect_memory_access_type memory_access_type;
 
   /* For INTEGER_INDUC_COND_REDUCTION, the initial value to be used.  */
   tree induc_cond_initial_val;
@@ -1555,9 +1575,6 @@ struct gather_scatter_info {
      being added to the base.  */
   int scale;
 
-  /* The definition type for the vectorized offset.  */
-  enum vect_def_type offset_dt;
-
   /* The type of the vectorized offset.  */
   tree offset_vectype;
 
@@ -1569,7 +1586,6 @@ struct gather_scatter_info {
 };
 
 /* Access Functions.  */
-#define STMT_VINFO_TYPE(S)                 (S)->type
 #define STMT_VINFO_STMT(S)                 (S)->stmt
 #define STMT_VINFO_RELEVANT(S)             (S)->relevant
 #define STMT_VINFO_LIVE_P(S)               (S)->live
@@ -1578,7 +1594,6 @@ struct gather_scatter_info {
 #define STMT_VINFO_DATA_REF(S)             ((S)->dr_aux.dr + 0)
 #define STMT_VINFO_GATHER_SCATTER_P(S)	   (S)->gather_scatter_p
 #define STMT_VINFO_STRIDED_P(S)	   	   (S)->strided_p
-#define STMT_VINFO_MEMORY_ACCESS_TYPE(S)   (S)->memory_access_type
 #define STMT_VINFO_SIMD_LANE_ACCESS_P(S)   (S)->simd_lane_access_p
 #define STMT_VINFO_VEC_INDUC_COND_INITIAL_VAL(S) (S)->induc_cond_initial_val
 #define STMT_VINFO_REDUC_EPILOGUE_ADJUSTMENT(S) (S)->reduc_epilogue_adjustment
@@ -1712,6 +1727,7 @@ public:
   unsigned int total_cost () const;
   unsigned int suggested_unroll_factor () const;
   machine_mode suggested_epilogue_mode (int &masked) const;
+  bool costing_for_scalar () const { return m_costing_for_scalar; }
 
 protected:
   unsigned int record_stmt_cost (stmt_vec_info, vect_cost_model_location,
@@ -1994,6 +2010,13 @@ add_stmt_cost (vector_costs *costs, int count,
 	       tree vectype, int misalign,
 	       enum vect_cost_model_location where)
 {
+  /* Even though a vector type might be set on stmt do not pass that on when
+     costing the scalar IL.  A SLP node shouldn't have been recorded.  */
+  if (costs->costing_for_scalar ())
+    {
+      vectype = NULL_TREE;
+      gcc_checking_assert (node == NULL);
+    }
   unsigned cost = costs->add_stmt_cost (count, kind, stmt_info, node, vectype,
 					misalign, where);
   if (dump_file && (dump_flags & TDF_DETAILS))
@@ -2817,18 +2840,6 @@ inline bool
 vect_is_reduction (stmt_vec_info stmt_info)
 {
   return STMT_VINFO_REDUC_IDX (stmt_info) >= 0;
-}
-
-/* Returns the memory acccess type being used to vectorize the statement.  If
-   SLP this is read from NODE, otherwise it's read from the STMT_VINFO.  */
-
-inline vect_memory_access_type
-vect_mem_access_type (stmt_vec_info stmt_info, slp_tree node)
-{
-  if (node)
-    return SLP_TREE_MEMORY_ACCESS_TYPE (node);
-  else
-    return STMT_VINFO_MEMORY_ACCESS_TYPE (stmt_info);
 }
 
 /* If STMT_INFO describes a reduction, return the vect_reduction_type

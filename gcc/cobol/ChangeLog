@@ -1,3 +1,26 @@
+2025-08-02  Jakub Jelinek  <jakub@redhat.com>
+
+	* parse.y (intrinsic): Use %td format specifier with no cast on
+	argument instead of %ld with cast to long.
+	* scan_ante.h (numstr_of): Likewise.
+	* util.cc (cbl_field_t::report_invalid_initial_value): Likewise.
+
+2025-08-01  Robert Dubner  <rdubner@symas.com>
+
+	PR cobol/119324
+	* cbldiag.h (location_dump): Inline suppression of knownConditionTrueFalse.
+	* genapi.cc (parser_statement_begin): Combine two if() statements.
+	* genutil.cc (get_binary_value): File-level suppression of duplicateBreak.
+	* symbols.cc (symbol_elem_cmp): File-level suppression of duplicateBreak.
+
+2025-07-31  Robert Dubner  <rdubner@symas.com>
+
+	PR cobol/120244
+	* genapi.cc (get_level_88_domain): Increase array size for final byte.
+	(psa_FldLiteralA): Use correct length in build_string_literal call.
+	* scan.l: Use a loop instead of std:transform to avoid EOF overrun.
+	* scan_ante.h (binary_integer_usage): Use a variable-length buffer.
+
 2025-07-25  David Malcolm  <dmalcolm@redhat.com>
 
 	* util.cc: Update for diagnostic_t becoming

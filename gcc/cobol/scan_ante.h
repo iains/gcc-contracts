@@ -149,7 +149,7 @@ numstr_of( const char string[], radix_t radix = decimal_e ) {
     }
     auto nx = std::count_if(input, p, fisdigit);
     if( 36 < nx ) {
-      error_msg(yylloc, "significand of %s has more than 36 digits (%ld)", input, (long)nx);
+      error_msg(yylloc, "significand of %s has more than 36 digits (%td)", input, nx);
       return NO_CONDITION;
     }
 
@@ -609,7 +609,9 @@ static const std::map <std::string, bint_t > binary_integers {
 
 static int
 binary_integer_usage( const char name[]) {
-  cbl_name_t uname = {};
+  // uname can't be cbl_name_t, because at this point name[] might have more
+  // than sizeof(cbl_name_t) characters.  The length check comes later.
+  char *uname = xstrdup(name);
   std::transform(name, name + strlen(name), uname, ftoupper);
 
   dbgmsg("%s:%d: checking %s in %zu keyword_aliases",
@@ -628,6 +630,7 @@ binary_integer_usage( const char name[]) {
   yylval.computational.signable = p->second.signable;
   dbgmsg("%s:%d: %s has type %d", __func__, __LINE__,
 	 uname, p->second.type );
+  free(uname);
   return p->second.token;
 }
       

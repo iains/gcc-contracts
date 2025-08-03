@@ -1,3 +1,76 @@
+2025-08-01  Mikael Morin  <mikael@gcc.gnu.org>
+
+	* trans-decl.cc (gfc_trans_deferred_vars): Fix closing brace in
+	a comment.
+
+2025-07-31  Mikael Morin  <morin-mikael@orange.fr>
+
+	PR fortran/121342
+	* trans-expr.cc (gfc_conv_subref_array_arg): Remove offset
+	update.
+	(gfc_conv_procedure_call): For polymorphic functions, move the
+	scalarizer descriptor information...
+	* trans-array.cc (gfc_add_loop_ss_code): ... here, and evaluate
+	the bounds to fresh variables.
+	(get_class_info_from_ss): Remove offset update.
+	(gfc_conv_ss_startstride): Don't set a zero value for function
+	result upper bounds.
+	(late_set_loop_bounds): New.
+	(gfc_conv_loop_setup): If the bounds of a function result have
+	been set, and no other array provided loop bounds for a
+	dimension, use the function result bounds as loop bounds for
+	that dimension.
+	(gfc_set_delta): Don't skip delta setting for polymorphic
+	function results.
+
+2025-07-30  Mikael Morin  <morin-mikael@orange.fr>
+
+	* trans-array.cc (gfc_array_init_size): Remove the nelems
+	argument.
+	(gfc_array_allocate): Update caller.  Remove the nelems
+	argument.
+	* trans-stmt.cc (gfc_trans_allocate): Update caller.  Remove the
+	nelems variable.
+	* trans-array.h (gfc_array_allocate): Update prototype.
+
+2025-07-30  Yuao Ma  <c8ef@outlook.com>
+
+	* check.cc (gfc_check_split): Argument check for SPLIT.
+	* gfortran.h (enum gfc_isym_id): Define GFC_ISYM_SPLIT.
+	* intrinsic.cc (add_subroutines): Register SPLIT intrinsic.
+	* intrinsic.h (gfc_check_split): New decl.
+	(gfc_resolve_split): Ditto.
+	* intrinsic.texi: SPLIT documentation.
+	* iresolve.cc (gfc_resolve_split): Add resolved_sym for SPLIT.
+	* trans-decl.cc (gfc_build_intrinsic_function_decls): Add decl for
+	SPLIT in libgfortran.
+	* trans-intrinsic.cc (conv_intrinsic_split): SPLIT codegen.
+	(gfc_conv_intrinsic_subroutine): Handle SPLIT case.
+	* trans.h (GTY): Declare gfor_fndecl_string_split{, _char4}.
+
+2025-07-27  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/121185
+	* trans-expr.cc (gfc_trans_assignment_1): Use the same condition
+	to set the is_alloc_lhs flag and to decide to generate
+	reallocation code.  Add explicit call to gfc_fix_class_refs
+	before evaluating the condition.
+
+2025-07-27  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/121185
+	* trans-array.cc (set_factored_descriptor_value): Also trigger
+	the saving of the previously selected reference on encountering
+	an INDIRECT_REF.  Extract the saving code...
+	(save_ref): ... here as a new function.
+
+2025-07-27  Mikael Morin  <mikael@gcc.gnu.org>
+
+	PR fortran/121185
+	* trans-expr.cc (gfc_get_class_from_expr): Give up class
+	container lookup on the second COMPONENT_REF after an array
+	descriptor.
+
 2025-07-25  David Malcolm  <dmalcolm@redhat.com>
 
 	* error.cc: Make diagnostics::context::m_source_printing private.

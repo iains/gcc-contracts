@@ -6602,6 +6602,9 @@ cxx_eval_vec_init_1 (const constexpr_ctx *ctx, tree atype, tree init,
     return cxx_eval_bare_aggregate (ctx, init, lval,
 				    non_constant_p, overflow_p, jump_target);
 
+  /* We already checked access when building the VEC_INIT_EXPR.  */
+  deferring_access_check_sentinel acs (dk_deferred);
+
   /* For the default constructor, build up a call to the default
      constructor of the element type.  We only need to handle class types
      here, as for a constructor to be constexpr, all members must be
@@ -10333,11 +10336,14 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
 	{
 	  if (cxx_dialect < cxx20)
 	    return t;
-	  if (TREE_CODE (t) != CALL_EXPR && TREE_CODE (t) != AGGR_INIT_EXPR)
+	  /* We could have a COMPOUND_EXPR here coming from
+	     keep_unused_object_arg.  */
+	  tree x = extract_call_expr (t);
+	  if (x == NULL_TREE || x == error_mark_node)
 	    return t;
 	  /* Calls to immediate functions returning void need to be
 	     evaluated.  */
-	  tree fndecl = cp_get_callee_fndecl_nofold (t);
+	  tree fndecl = cp_get_callee_fndecl_nofold (x);
 	  if (fndecl == NULL_TREE || !DECL_IMMEDIATE_FUNCTION_P (fndecl))
 	    return t;
 	  else

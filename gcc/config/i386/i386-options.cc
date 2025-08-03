@@ -3615,6 +3615,18 @@ ix86_handle_cconv_attribute (tree *node, tree name, tree args, int,
       return NULL_TREE;
     }
 
+  if (TARGET_64BIT)
+    {
+      /* Do not warn when emulating the MS ABI.  */
+      if ((TREE_CODE (*node) != FUNCTION_TYPE
+	   && TREE_CODE (*node) != METHOD_TYPE)
+	  || ix86_function_type_abi (*node) != MS_ABI)
+	warning (OPT_Wattributes, "%qE attribute ignored",
+		 name);
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+
   /* Can combine regparm with all attributes but fastcall, and thiscall.  */
   if (is_attribute_p ("regparm", name))
     {
@@ -3627,7 +3639,7 @@ ix86_handle_cconv_attribute (tree *node, tree name, tree args, int,
 
       if (lookup_attribute ("thiscall", TYPE_ATTRIBUTES (*node)))
 	{
-	  error ("regparam and thiscall attributes are not compatible");
+	  error ("regparm and thiscall attributes are not compatible");
 	}
 
       cst = TREE_VALUE (args);
@@ -3648,19 +3660,7 @@ ix86_handle_cconv_attribute (tree *node, tree name, tree args, int,
       return NULL_TREE;
     }
 
-  if (TARGET_64BIT)
-    {
-      /* Do not warn when emulating the MS ABI.  */
-      if ((TREE_CODE (*node) != FUNCTION_TYPE
-	   && TREE_CODE (*node) != METHOD_TYPE)
-	  || ix86_function_type_abi (*node) != MS_ABI)
-	warning (OPT_Wattributes, "%qE attribute ignored",
-	         name);
-      *no_add_attrs = true;
-      return NULL_TREE;
-    }
-
-  /* Can combine fastcall with stdcall (redundant) and sseregparm.  */
+  /* Can combine fastcall with sseregparm.  */
   if (is_attribute_p ("fastcall", name))
     {
       if (lookup_attribute ("cdecl", TYPE_ATTRIBUTES (*node)))
@@ -3681,8 +3681,7 @@ ix86_handle_cconv_attribute (tree *node, tree name, tree args, int,
 	}
     }
 
-  /* Can combine stdcall with fastcall (redundant), regparm and
-     sseregparm.  */
+  /* Can combine stdcall with regparm and sseregparm.  */
   else if (is_attribute_p ("stdcall", name))
     {
       if (lookup_attribute ("cdecl", TYPE_ATTRIBUTES (*node)))
@@ -3731,6 +3730,10 @@ ix86_handle_cconv_attribute (tree *node, tree name, tree args, int,
       if (lookup_attribute ("cdecl", TYPE_ATTRIBUTES (*node)))
 	{
 	  error ("cdecl and thiscall attributes are not compatible");
+	}
+      if (lookup_attribute ("regparm", TYPE_ATTRIBUTES (*node)))
+	{
+	  error ("regparm and thiscall attributes are not compatible");
 	}
     }
 

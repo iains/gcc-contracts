@@ -1,3 +1,83 @@
+2025-08-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/108080
+	* module.cc (trees_out::core_vals): Warn when streaming
+	target/optimize node; adjust comments.
+	(trees_in::core_vals): Don't stream a target/optimize node.
+
+2025-08-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/121238
+	* module.cc (trees_in::fn_parms_fini): Merge properties for
+	definitions.
+
+2025-07-31  Jason Merrill  <jason@redhat.com>
+
+	PR c++/120800
+	* constexpr.cc (cxx_eval_vec_init_1): Suppress access control.
+
+2025-07-31  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/120775
+	* constexpr.cc (cxx_eval_outermost_constant_expr): Use
+	extract_call_expr.
+	* cp-tree.h (CONSTEVAL_BLOCK_P, LAMBDA_EXPR_CONSTEVAL_BLOCK_P): Define.
+	(finish_static_assert): Adjust declaration.
+	(current_nonlambda_function): Likewise.
+	* lambda.cc (current_nonlambda_function): New parameter.  Only keep
+	iterating if the function represents a consteval block.
+	* parser.cc (cp_parser_lambda_expression): New parameter for
+	consteval blocks.  Use it.  Set LAMBDA_EXPR_CONSTEVAL_BLOCK_P.
+	(cp_parser_lambda_declarator_opt): Likewise.
+	(build_empty_string): New.
+	(cp_parser_next_tokens_are_consteval_block_p): New.
+	(cp_parser_consteval_block): New.
+	(cp_parser_block_declaration): Handle consteval blocks.
+	(cp_parser_static_assert): Use build_empty_string.
+	(cp_parser_member_declaration): Handle consteval blocks.
+	* pt.cc (tsubst_stmt): Adjust a call to finish_static_assert.
+	* semantics.cc (finish_fname): Warn for consteval blocks.
+	(finish_static_assert): New parameter for consteval blocks.  Set
+	CONSTEVAL_BLOCK_P.  Evaluate consteval blocks specially.
+
+2025-07-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/121291
+	* constraint.cc (diagnose_trait_expr): Remove assumption about
+	failures returning error_mark_node.
+	* except.cc (explain_not_noexcept): Allow expr not being
+	noexcept.
+	* method.cc (build_invoke): Adjust comment.
+	(is_trivially_xible): Always note non-trivial components if expr
+	is not null or error_mark_node.
+	(is_nothrow_xible): Likewise for non-noexcept components.
+	(is_nothrow_convertible): Likewise.
+
+2025-07-30  Jason Merrill  <jason@redhat.com>
+
+	* pt.cc (convert_nontype_argument_function): Check
+	cxx_constant_value on failure.
+	(invalid_tparm_referent_p): Likewise.
+
+2025-07-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/121133
+	* parser.cc (cp_parser_unary_expression): Adjust
+	cp_parser_extension_opt caller and restore warn_long_long.
+	(cp_parser_declaration): Likewise.
+	(cp_parser_block_declaration): Likewise.
+	(cp_parser_member_declaration): Likewise.
+	(cp_parser_extension_opt): Add SAVED_LONG_LONG argument,
+	save previous warn_long_long state into it and clear it
+	for __extension__.
+
+2025-07-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* cp-tree.h (struct lang_type): Add comment mentioning modules.
+	* module.cc (trees_out::lang_type_bools): Stream new flags, use
+	gcc_checking_assert.
+	(trees_in::lang_type_bools): Likewise.
+
 2025-07-25  David Malcolm  <dmalcolm@redhat.com>
 
 	* constexpr.cc: Update usage of "diagnostic_info" to explicitly

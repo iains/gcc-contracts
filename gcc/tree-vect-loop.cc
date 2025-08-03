@@ -1919,7 +1919,6 @@ vect_create_loop_vinfo (class loop *loop, vec_info_shared *shared,
   for (gcond *cond : info->conds)
     {
       stmt_vec_info loop_cond_info = loop_vinfo->lookup_stmt (cond);
-      STMT_VINFO_TYPE (loop_cond_info) = loop_exit_ctrl_vec_info_type;
       /* Mark the statement as a condition.  */
       STMT_VINFO_DEF_TYPE (loop_cond_info) = vect_condition_def;
     }
@@ -1936,9 +1935,6 @@ vect_create_loop_vinfo (class loop *loop, vec_info_shared *shared,
 
   if (info->inner_loop_cond)
     {
-      stmt_vec_info inner_loop_cond_info
-	= loop_vinfo->lookup_stmt (info->inner_loop_cond);
-      STMT_VINFO_TYPE (inner_loop_cond_info) = loop_exit_ctrl_vec_info_type;
       /* If we have an estimate on the number of iterations of the inner
 	 loop use that to limit the scale for costing, otherwise use
 	 --param vect-inner-loop-cost-factor literally.  */
@@ -7151,7 +7147,7 @@ vectorizable_lane_reducing (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
     }
 
   /* Transform via vect_transform_reduction.  */
-  STMT_VINFO_TYPE (stmt_info) = reduc_vec_info_type;
+  SLP_TREE_TYPE (slp_node) = reduc_vec_info_type;
   return true;
 }
 
@@ -7253,18 +7249,17 @@ vectorizable_reduction (loop_vec_info loop_vinfo,
 	      }
 	  /* Analysis for double-reduction is done on the outer
 	     loop PHI, nested cycles have no further restrictions.  */
-	  STMT_VINFO_TYPE (stmt_info) = cycle_phi_info_type;
+	  SLP_TREE_TYPE (slp_node) = cycle_phi_info_type;
 	}
       else
-	STMT_VINFO_TYPE (stmt_info) = reduc_vec_info_type;
+	SLP_TREE_TYPE (slp_node) = reduc_vec_info_type;
       return true;
     }
 
-  stmt_vec_info orig_stmt_of_analysis = stmt_info;
   stmt_vec_info phi_info = stmt_info;
   if (!is_a <gphi *> (stmt_info->stmt))
     {
-      STMT_VINFO_TYPE (stmt_info) = reduc_vec_info_type;
+      SLP_TREE_TYPE (slp_node) = reduc_vec_info_type;
       return true;
     }
   if (STMT_VINFO_DEF_TYPE (stmt_info) == vect_double_reduction_def)
@@ -8074,7 +8069,7 @@ vectorizable_reduction (loop_vec_info loop_vinfo,
       && reduction_type == FOLD_LEFT_REDUCTION)
     dump_printf_loc (MSG_NOTE, vect_location,
 		     "using an in-order (fold-left) reduction.\n");
-  STMT_VINFO_TYPE (orig_stmt_of_analysis) = cycle_phi_info_type;
+  SLP_TREE_TYPE (slp_node) = cycle_phi_info_type;
 
   /* All but single defuse-cycle optimized and fold-left reductions go
      through their own vectorizable_* routines.  */
@@ -8770,7 +8765,7 @@ vectorizable_lc_phi (loop_vec_info loop_vinfo,
       return false;
     }
 
-  STMT_VINFO_TYPE (stmt_info) = lc_phi_info_type;
+  SLP_TREE_TYPE (slp_node) = lc_phi_info_type;
   return true;
 }
 
@@ -8855,7 +8850,7 @@ vectorizable_phi (vec_info *,
       if (gimple_phi_num_args (as_a <gphi *> (stmt_info->stmt)) > 1)
 	record_stmt_cost (cost_vec, SLP_TREE_NUMBER_OF_VEC_STMTS (slp_node),
 			  vector_stmt, stmt_info, vectype, 0, vect_body);
-      STMT_VINFO_TYPE (stmt_info) = phi_info_type;
+      SLP_TREE_TYPE (slp_node) = phi_info_type;
       return true;
     }
 
@@ -8970,6 +8965,33 @@ vectorizable_recurr (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
       return false;
     }
 
+  /* We need to be able to build a { ..., a, b } init vector with
+     dist number of distinct trailing values.  Always possible
+     when dist == 1 or when nunits is constant or when the initializations
+     are uniform.  */
+  tree uniform_initval = NULL_TREE;
+  edge pe = loop_preheader_edge (LOOP_VINFO_LOOP (loop_vinfo));
+  for (stmt_vec_info s : SLP_TREE_SCALAR_STMTS (slp_node))
+    {
+      gphi *phi = as_a <gphi *> (s->stmt);
+      if (! uniform_initval)
+	uniform_initval = PHI_ARG_DEF_FROM_EDGE (phi, pe);
+      else if (! operand_equal_p (uniform_initval,
+				  PHI_ARG_DEF_FROM_EDGE (phi, pe)))
+	{
+	  uniform_initval = NULL_TREE;
+	  break;
+	}
+    }
+  if (!uniform_initval && !nunits.is_constant ())
+    {
+      if (dump_enabled_p ())
+	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+			 "cannot build initialization vector for "
+			 "first order recurrence\n");
+      return false;
+    }
+
   /* First-order recurrence autovectorization needs to handle permutation
      with indices = [nunits-1, nunits, nunits+1, ...].  */
   vec_perm_builder sel (nunits, 1, 3);
@@ -9016,25 +9038,42 @@ vectorizable_recurr (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
 			 "prologue_cost = %d .\n", inside_cost,
 			 prologue_cost);
 
-      STMT_VINFO_TYPE (stmt_info) = recurr_info_type;
+      SLP_TREE_TYPE (slp_node) = recurr_info_type;
       return true;
     }
 
-  edge pe = loop_preheader_edge (LOOP_VINFO_LOOP (loop_vinfo));
-  basic_block bb = gimple_bb (phi);
-  tree preheader = PHI_ARG_DEF_FROM_EDGE (phi, pe);
-  if (!useless_type_conversion_p (TREE_TYPE (vectype), TREE_TYPE (preheader)))
+  tree vec_init;
+  if (! uniform_initval)
     {
-      gimple_seq stmts = NULL;
-      preheader = gimple_convert (&stmts, TREE_TYPE (vectype), preheader);
-      gsi_insert_seq_on_edge_immediate (pe, stmts);
+      vec<constructor_elt, va_gc> *v = NULL;
+      vec_alloc (v, nunits.to_constant ());
+      for (unsigned i = 0; i < nunits.to_constant () - dist; ++i)
+	CONSTRUCTOR_APPEND_ELT (v, NULL_TREE,
+				build_zero_cst (TREE_TYPE (vectype)));
+      for (stmt_vec_info s : SLP_TREE_SCALAR_STMTS (slp_node))
+	{
+	  gphi *phi = as_a <gphi *> (s->stmt);
+	  tree preheader = PHI_ARG_DEF_FROM_EDGE (phi, pe);
+	  if (!useless_type_conversion_p (TREE_TYPE (vectype),
+					  TREE_TYPE (preheader)))
+	    {
+	      gimple_seq stmts = NULL;
+	      preheader = gimple_convert (&stmts,
+					  TREE_TYPE (vectype), preheader);
+	      gsi_insert_seq_on_edge_immediate (pe, stmts);
+	    }
+	  CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, preheader);
+	}
+      vec_init = build_constructor (vectype, v);
     }
-  tree vec_init = build_vector_from_val (vectype, preheader);
+  else
+    vec_init = uniform_initval;
   vec_init = vect_init_vector (loop_vinfo, stmt_info, vec_init, vectype, NULL);
 
   /* Create the vectorized first-order PHI node.  */
   tree vec_dest = vect_get_new_vect_var (vectype,
 					 vect_simple_var, "vec_recur_");
+  basic_block bb = gimple_bb (phi);
   gphi *new_phi = create_phi_node (vec_dest, bb);
   add_phi_arg (new_phi, vec_init, pe, UNKNOWN_LOCATION);
 
@@ -9552,7 +9591,7 @@ vectorizable_nonlinear_induction (loop_vec_info loop_vinfo,
 			 "prologue_cost = %d. \n", inside_cost,
 			 prologue_cost);
 
-      STMT_VINFO_TYPE (stmt_info) = induc_vec_info_type;
+      SLP_TREE_TYPE (slp_node) = induc_vec_info_type;
       DUMP_VECT_SCOPE ("vectorizable_nonlinear_induction");
       return true;
     }
@@ -9853,7 +9892,7 @@ vectorizable_induction (loop_vec_info loop_vinfo,
 			 "prologue_cost = %d .\n", inside_cost,
 			 prologue_cost);
 
-      STMT_VINFO_TYPE (stmt_info) = induc_vec_info_type;
+      SLP_TREE_TYPE (slp_node) = induc_vec_info_type;
       DUMP_VECT_SCOPE ("vectorizable_induction");
       return true;
     }
@@ -11253,11 +11292,9 @@ update_epilogue_loop_vinfo (class loop *epilogue, tree advance)
 	 updated offset we set using ADVANCE.  Instead we have to make sure the
 	 reference in the data references point to the corresponding copy of
 	 the original in the epilogue.  Make sure to update both
-	 gather/scatters recognized by dataref analysis and also other
-	 refs that get_load_store_type classified as VMAT_GATHER_SCATTER.  */
+	 gather/scatters recognized by dataref analysis.  */
       auto vstmt_vinfo = vect_stmt_to_vectorize (stmt_vinfo);
-      if (STMT_VINFO_MEMORY_ACCESS_TYPE (vstmt_vinfo) == VMAT_GATHER_SCATTER
-	  || STMT_VINFO_STRIDED_P (vstmt_vinfo)
+      if (STMT_VINFO_STRIDED_P (vstmt_vinfo)
 	  || STMT_VINFO_GATHER_SCATTER_P (vstmt_vinfo))
 	{
 	  /* ???  As we copy epilogues from the main loop incremental
@@ -11279,9 +11316,6 @@ update_epilogue_loop_vinfo (class loop *epilogue, tree advance)
 
   /* Remember the advancement made.  */
   LOOP_VINFO_DRS_ADVANCED_BY (epilogue_vinfo) = advance;
-
-  epilogue_vinfo->shared->datarefs_copy.release ();
-  epilogue_vinfo->shared->save_datarefs ();
 }
 
 /*  When vectorizing early break statements instructions that happen before
@@ -11387,7 +11421,8 @@ vect_transform_loop (loop_vec_info loop_vinfo, gimple *loop_vectorized_call)
 
   DUMP_VECT_SCOPE ("vec_transform_loop");
 
-  loop_vinfo->shared->check_datarefs ();
+  if (! LOOP_VINFO_EPILOGUE_P (loop_vinfo))
+    loop_vinfo->shared->check_datarefs ();
 
   /* Use the more conservative vectorization threshold.  If the number
      of iterations is constant assume the cost check has been performed

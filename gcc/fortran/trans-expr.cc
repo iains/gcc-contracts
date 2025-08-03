@@ -714,6 +714,8 @@ gfc_get_class_from_expr (tree expr)
 {
   tree tmp;
   tree type;
+  bool array_descr_found = false;
+  bool comp_after_descr_found = false;
 
   for (tmp = expr; tmp; tmp = TREE_OPERAND (tmp, 0))
     {
@@ -725,6 +727,8 @@ gfc_get_class_from_expr (tree expr)
 	{
 	  if (GFC_CLASS_TYPE_P (type))
 	    return tmp;
+	  if (GFC_DESCRIPTOR_TYPE_P (type))
+	    array_descr_found = true;
 	  if (type != TYPE_CANONICAL (type))
 	    type = TYPE_CANONICAL (type);
 	  else
@@ -732,6 +736,23 @@ gfc_get_class_from_expr (tree expr)
 	}
       if (VAR_P (tmp) || TREE_CODE (tmp) == PARM_DECL)
 	break;
+
+      /* Avoid walking up the reference chain too far.  For class arrays, the
+	 array descriptor is a direct component (through a pointer) of the class
+	 container.  So there is exactly one COMPONENT_REF between a class
+	 container and its child array descriptor.  After seeing an array
+	 descriptor, we can give up on the second COMPONENT_REF we see, if no
+	 class container was found until that point.  */
+      if (array_descr_found)
+	{
+	  if (comp_after_descr_found)
+	    {
+	      if (TREE_CODE (tmp) == COMPONENT_REF)
+		return NULL_TREE;
+	    }
+	  else if (TREE_CODE (tmp) == COMPONENT_REF)
+	    comp_after_descr_found = true;
+	}
     }
 
   if (POINTER_TYPE_P (TREE_TYPE (tmp)))
@@ -5464,16 +5485,6 @@ gfc_conv_subref_array_arg (gfc_se *se, gfc_expr * expr, int g77,
   /* Translate the expression.  */
   gfc_conv_expr (&rse, expr);
 
-  /* Reset the offset for the function call since the loop
-     is zero based on the data pointer.  Note that the temp
-     comes first in the loop chain since it is added second.  */
-  if (gfc_is_class_array_function (expr))
-    {
-      tmp = loop.ss->loop_chain->info->data.array.descriptor;
-      gfc_conv_descriptor_offset_set (&loop.pre, tmp,
-				      gfc_index_zero_node);
-    }
-
   gfc_conv_tmp_array_ref (&lse);
 
   if (intent != INTENT_OUT)
@@ -8843,28 +8854,9 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
 	  && se->expr && GFC_CLASS_TYPE_P (TREE_TYPE (se->expr))
 	  && expr->must_finalize)
 	{
-	  int n;
-	  if (se->ss && se->ss->loop)
-	    {
-	      gfc_add_block_to_block (&se->ss->loop->pre, &se->pre);
-	      se->expr = gfc_evaluate_now (se->expr, &se->ss->loop->pre);
-	      tmp = gfc_class_data_get (se->expr);
-	      info->descriptor = tmp;
-	      info->data = gfc_conv_descriptor_data_get (tmp);
-	      info->offset = gfc_conv_descriptor_offset_get (tmp);
-	      for (n = 0; n < se->ss->loop->dimen; n++)
-		{
-		  tree dim = gfc_rank_cst[n];
-		  se->ss->loop->to[n] = gfc_conv_descriptor_ubound_get (tmp, dim);
-		  se->ss->loop->from[n] = gfc_conv_descriptor_lbound_get (tmp, dim);
-		}
-	    }
-	  else
-	    {
-	      /* TODO Eliminate the doubling of temporaries. This
-		 one is necessary to ensure no memory leakage.  */
-	      se->expr = gfc_evaluate_now (se->expr, &se->pre);
-	    }
+	  /* TODO Eliminate the doubling of temporaries.  This
+	     one is necessary to ensure no memory leakage.  */
+	  se->expr = gfc_evaluate_now (se->expr, &se->pre);
 
 	  /* Finalize the result, if necessary.  */
 	  attr = expr->value.function.esym
@@ -12871,9 +12863,16 @@ gfc_trans_assignment_1 (gfc_expr * expr1, gfc_expr * expr2, bool init_flag,
   gfc_init_se (&lse, NULL);
   gfc_init_se (&rse, NULL);
 
+  gfc_fix_class_refs (expr1);
+
+  realloc_flag = flag_realloc_lhs
+		 && gfc_is_reallocatable_lhs (expr1)
+		 && expr2->rank
+		 && !is_runtime_conformable (expr1, expr2);
+
   /* Walk the lhs.  */
   lss = gfc_walk_expr (expr1);
-  if (gfc_is_reallocatable_lhs (expr1))
+  if (realloc_flag)
     {
       lss->no_bounds_check = 1;
       lss->is_alloc_lhs = 1;
@@ -12923,11 +12922,6 @@ gfc_trans_assignment_1 (gfc_expr * expr1, gfc_expr * expr2, bool init_flag,
       && lhs_attr.flavor != FL_PROCEDURE;
 
   assoc_assign = is_assoc_assign (expr1, expr2);
-
-  realloc_flag = flag_realloc_lhs
-		 && gfc_is_reallocatable_lhs (expr1)
-		 && expr2->rank
-		 && !is_runtime_conformable (expr1, expr2);
 
   /* Only analyze the expressions for coarray properties, when in coarray-lib
      mode.  Avoid false-positive uninitialized diagnostics with initializing
