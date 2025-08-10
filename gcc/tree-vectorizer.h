@@ -306,6 +306,11 @@ struct _slp_tree {
   unsigned int lanes;
   /* The operation of this node.  */
   enum tree_code code;
+  /* For gather/scatter memory operations the scale each offset element
+     should be multiplied by before being added to the base.  */
+  int gs_scale;
+  /* For gather/scatter memory operations the loop-invariant base value.  */
+  tree gs_base;
   /* Whether uses of this load or feeders of this store are suitable
      for load/store-lanes.  */
   bool ldst_lanes;
@@ -412,6 +417,8 @@ public:
 #define SLP_TREE_CODE(S)			 (S)->code
 #define SLP_TREE_MEMORY_ACCESS_TYPE(S)		 (S)->memory_access_type
 #define SLP_TREE_TYPE(S)			 (S)->type
+#define SLP_TREE_GS_SCALE(S)			 (S)->gs_scale
+#define SLP_TREE_GS_BASE(S)			 (S)->gs_base
 
 enum vect_partial_vector_style {
     vect_partial_vectors_none,
@@ -912,7 +919,10 @@ public:
   int peeling_for_alignment;
 
   /* The mask used to check the alignment of pointers or arrays.  */
-  int ptr_mask;
+  poly_uint64 ptr_mask;
+
+  /* The maximum speculative read amount in VLA modes for runtime check.  */
+  poly_uint64 max_spec_read_amount;
 
   /* Indicates whether the loop has any non-linear IV.  */
   bool nonlinear_iv;
@@ -946,6 +956,10 @@ public:
   /* All reduction chains in the loop, represented by the first
      stmt in the chain.  */
   auto_vec<stmt_vec_info> reduction_chains;
+
+  /* Defs that could not be analyzed such as OMP SIMD calls without
+     a LHS.  */
+  auto_vec<stmt_vec_info> alternate_defs;
 
   /* Cost vector for a single scalar iteration.  */
   auto_vec<stmt_info_for_cost> scalar_cost_vec;
@@ -1144,6 +1158,7 @@ public:
 #define LOOP_VINFO_RGROUP_IV_TYPE(L)       (L)->rgroup_iv_type
 #define LOOP_VINFO_PARTIAL_VECTORS_STYLE(L) (L)->partial_vector_style
 #define LOOP_VINFO_PTR_MASK(L)             (L)->ptr_mask
+#define LOOP_VINFO_MAX_SPEC_READ_AMOUNT(L) (L)->max_spec_read_amount
 #define LOOP_VINFO_LOOP_NEST(L)            (L)->shared->loop_nest
 #define LOOP_VINFO_DATAREFS(L)             (L)->shared->datarefs
 #define LOOP_VINFO_DDRS(L)                 (L)->shared->ddrs
@@ -1186,6 +1201,7 @@ public:
 #define LOOP_VINFO_INNER_LOOP_COST_FACTOR(L) (L)->inner_loop_cost_factor
 #define LOOP_VINFO_INV_PATTERN_DEF_SEQ(L)  (L)->inv_pattern_def_seq
 #define LOOP_VINFO_DRS_ADVANCED_BY(L)      (L)->drs_advanced_by
+#define LOOP_VINFO_ALTERNATE_DEFS(L)       (L)->alternate_defs
 
 #define LOOP_VINFO_FULLY_MASKED_P(L)		\
   (LOOP_VINFO_USING_PARTIAL_VECTORS_P (L)	\
@@ -1197,6 +1213,8 @@ public:
 
 #define LOOP_REQUIRES_VERSIONING_FOR_ALIGNMENT(L)	\
   ((L)->may_misalign_stmts.length () > 0)
+#define LOOP_REQUIRES_VERSIONING_FOR_SPEC_READ(L)	\
+  (maybe_gt ((L)->max_spec_read_amount, 0U))
 #define LOOP_REQUIRES_VERSIONING_FOR_ALIAS(L)		\
   ((L)->comp_alias_ddrs.length () > 0 \
    || (L)->check_unequal_addrs.length () > 0 \
@@ -1207,6 +1225,7 @@ public:
   (LOOP_VINFO_SIMD_IF_COND (L))
 #define LOOP_REQUIRES_VERSIONING(L)			\
   (LOOP_REQUIRES_VERSIONING_FOR_ALIGNMENT (L)		\
+   || LOOP_REQUIRES_VERSIONING_FOR_SPEC_READ (L)	\
    || LOOP_REQUIRES_VERSIONING_FOR_ALIAS (L)		\
    || LOOP_REQUIRES_VERSIONING_FOR_NITERS (L)		\
    || LOOP_REQUIRES_VERSIONING_FOR_SIMD_IF_COND (L))
@@ -1288,26 +1307,12 @@ enum vect_relevant {
   vect_used_in_scope
 };
 
-/* The type of vectorization that can be applied to the stmt: regular loop-based
-   vectorization; pure SLP - the stmt is a part of SLP instances and does not
-   have uses outside SLP instances; or hybrid SLP and loop-based - the stmt is
-   a part of SLP instance and also must be loop-based vectorized, since it has
-   uses outside SLP sequences.
-
-   In the loop context the meanings of pure and hybrid SLP are slightly
-   different. By saying that pure SLP is applied to the loop, we mean that we
-   exploit only intra-iteration parallelism in the loop; i.e., the loop can be
-   vectorized without doing any conceptual unrolling, cause we don't pack
-   together stmts from different iterations, only within a single iteration.
-   Loop hybrid SLP means that we exploit both intra-iteration and
-   inter-iteration parallelism (e.g., number of elements in the vector is 4
-   and the slp-group-size is 2, in which case we don't have enough parallelism
-   within an iteration, so we obtain the rest of the parallelism from subsequent
-   iterations by unrolling the loop by 2).  */
+/* The type of vectorization.  pure_slp means the stmt is covered by the
+   SLP graph, not_vect means it is not.  This is mostly used by BB
+   vectorization.  */
 enum slp_vect_type {
-  loop_vect = 0,
+  not_vect = 0,
   pure_slp,
-  hybrid
 };
 
 /* Says whether a statement is a load, a store of a vectorized statement
@@ -1655,7 +1660,6 @@ struct gather_scatter_info {
 
 #define STMT_VINFO_RELEVANT_P(S)          ((S)->relevant != vect_unused_in_scope)
 
-#define HYBRID_SLP_STMT(S)                ((S)->slp_type == hybrid)
 #define PURE_SLP_STMT(S)                  ((S)->slp_type == pure_slp)
 #define STMT_SLP_TYPE(S)                   (S)->slp_type
 
@@ -2560,6 +2564,8 @@ extern bool vect_gather_scatter_fn_p (vec_info *, bool, bool, tree, tree,
 extern bool vect_check_gather_scatter (stmt_vec_info, loop_vec_info,
 				       gather_scatter_info *,
 				       vec<int> * = nullptr);
+extern void vect_describe_gather_scatter_call (stmt_vec_info,
+					       gather_scatter_info *);
 extern opt_result vect_find_stmt_data_reference (loop_p, gimple *,
 						 vec<data_reference_p> *,
 						 vec<int> *, int);

@@ -163,169 +163,6 @@ static void vect_estimate_min_profitable_iters (loop_vec_info, int *, int *,
 static stmt_vec_info vect_is_simple_reduction (loop_vec_info, stmt_vec_info,
 					       bool *, bool *, bool);
 
-/* Subroutine of vect_determine_vf_for_stmt that handles only one
-   statement.  VECTYPE_MAYBE_SET_P is true if STMT_VINFO_VECTYPE
-   may already be set for general statements (not just data refs).  */
-
-static opt_result
-vect_determine_vectype_for_stmt_1 (vec_info *vinfo, stmt_vec_info stmt_info,
-				   bool vectype_maybe_set_p)
-{
-  gimple *stmt = stmt_info->stmt;
-
-  if ((!STMT_VINFO_RELEVANT_P (stmt_info)
-       && !STMT_VINFO_LIVE_P (stmt_info))
-      || gimple_clobber_p (stmt))
-    {
-      if (dump_enabled_p ())
-	dump_printf_loc (MSG_NOTE, vect_location, "skip.\n");
-      return opt_result::success ();
-    }
-
-  tree stmt_vectype, nunits_vectype;
-  opt_result res = vect_get_vector_types_for_stmt (vinfo, stmt_info,
-						   &stmt_vectype,
-						   &nunits_vectype);
-  if (!res)
-    return res;
-
-  if (stmt_vectype)
-    {
-      if (STMT_VINFO_VECTYPE (stmt_info))
-	/* The only case when a vectype had been already set is for stmts
-	   that contain a data ref, or for "pattern-stmts" (stmts generated
-	   by the vectorizer to represent/replace a certain idiom).  */
-	gcc_assert ((STMT_VINFO_DATA_REF (stmt_info)
-		     || vectype_maybe_set_p)
-		    && STMT_VINFO_VECTYPE (stmt_info) == stmt_vectype);
-      else
-	STMT_VINFO_VECTYPE (stmt_info) = stmt_vectype;
-    }
-
-  return opt_result::success ();
-}
-
-/* Subroutine of vect_determine_vectorization_factor.  Set the vector
-   types of STMT_INFO and all attached pattern statements and update
-   the vectorization factor VF accordingly.  Return true on success
-   or false if something prevented vectorization.  */
-
-static opt_result
-vect_determine_vectype_for_stmt (vec_info *vinfo, stmt_vec_info stmt_info)
-{
-  if (dump_enabled_p ())
-    dump_printf_loc (MSG_NOTE, vect_location, "==> examining statement: %G",
-		     stmt_info->stmt);
-  opt_result res = vect_determine_vectype_for_stmt_1 (vinfo, stmt_info, false);
-  if (!res)
-    return res;
-
-  if (STMT_VINFO_IN_PATTERN_P (stmt_info)
-      && STMT_VINFO_RELATED_STMT (stmt_info))
-    {
-      gimple *pattern_def_seq = STMT_VINFO_PATTERN_DEF_SEQ (stmt_info);
-      stmt_info = STMT_VINFO_RELATED_STMT (stmt_info);
-
-      /* If a pattern statement has def stmts, analyze them too.  */
-      for (gimple_stmt_iterator si = gsi_start (pattern_def_seq);
-	   !gsi_end_p (si); gsi_next (&si))
-	{
-	  stmt_vec_info def_stmt_info = vinfo->lookup_stmt (gsi_stmt (si));
-	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_NOTE, vect_location,
-			     "==> examining pattern def stmt: %G",
-			     def_stmt_info->stmt);
-	  res = vect_determine_vectype_for_stmt_1 (vinfo, def_stmt_info, true);
-	  if (!res)
-	    return res;
-	}
-
-      if (dump_enabled_p ())
-	dump_printf_loc (MSG_NOTE, vect_location,
-			 "==> examining pattern statement: %G",
-			 stmt_info->stmt);
-      res = vect_determine_vectype_for_stmt_1 (vinfo, stmt_info, true);
-      if (!res)
-	return res;
-    }
-
-  return opt_result::success ();
-}
-
-/* Function vect_set_stmts_vectype
-
-   Set STMT_VINFO_VECTYPE of all stmts.  */
-
-static opt_result
-vect_set_stmts_vectype (loop_vec_info loop_vinfo)
-{
-  class loop *loop = LOOP_VINFO_LOOP (loop_vinfo);
-  basic_block *bbs = LOOP_VINFO_BBS (loop_vinfo);
-  unsigned nbbs = loop->num_nodes;
-  tree scalar_type = NULL_TREE;
-  gphi *phi;
-  tree vectype;
-  stmt_vec_info stmt_info;
-  unsigned i;
-
-  DUMP_VECT_SCOPE ("vect_set_stmts_vectype");
-
-  for (i = 0; i < nbbs; i++)
-    {
-      basic_block bb = bbs[i];
-
-      for (gphi_iterator si = gsi_start_phis (bb); !gsi_end_p (si);
-	   gsi_next (&si))
-	{
-	  phi = si.phi ();
-	  stmt_info = loop_vinfo->lookup_stmt (phi);
-	  if (dump_enabled_p ())
-	    dump_printf_loc (MSG_NOTE, vect_location, "==> examining phi: %G",
-			     (gimple *) phi);
-
-	  gcc_assert (stmt_info);
-
-	  if (STMT_VINFO_RELEVANT_P (stmt_info)
-	      || STMT_VINFO_LIVE_P (stmt_info))
-            {
-	      gcc_assert (!STMT_VINFO_VECTYPE (stmt_info));
-              scalar_type = TREE_TYPE (PHI_RESULT (phi));
-
-	      if (dump_enabled_p ())
-		dump_printf_loc (MSG_NOTE, vect_location,
-				 "get vectype for scalar type:  %T\n",
-				 scalar_type);
-
-	      vectype = get_vectype_for_scalar_type (loop_vinfo, scalar_type);
-	      if (!vectype)
-		return opt_result::failure_at (phi,
-					       "not vectorized: unsupported "
-					       "data-type %T\n",
-					       scalar_type);
-	      STMT_VINFO_VECTYPE (stmt_info) = vectype;
-
-	      if (dump_enabled_p ())
-		dump_printf_loc (MSG_NOTE, vect_location, "vectype: %T\n",
-				 vectype);
-	    }
-	}
-
-      for (gimple_stmt_iterator si = gsi_start_bb (bb); !gsi_end_p (si);
-	   gsi_next (&si))
-	{
-	  if (is_gimple_debug (gsi_stmt (si)))
-	    continue;
-	  stmt_info = loop_vinfo->lookup_stmt (gsi_stmt (si));
-	  opt_result res
-	    = vect_determine_vectype_for_stmt (loop_vinfo, stmt_info);
-	  if (!res)
-	    return res;
-        }
-    }
-
-  return opt_result::success ();
-}
-
 
 /* Function vect_is_simple_iv_evolution.
 
@@ -1009,6 +846,7 @@ _loop_vec_info::_loop_vec_info (class loop *loop_in, vec_info_shared *shared)
     unaligned_dr (NULL),
     peeling_for_alignment (0),
     ptr_mask (0),
+    max_spec_read_amount (0),
     nonlinear_iv (false),
     ivexpr_map (NULL),
     scan_map (NULL),
@@ -2482,15 +2320,6 @@ vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
     }
   LOOP_VINFO_MAX_VECT_FACTOR (loop_vinfo) = max_vf;
 
-  ok = vect_set_stmts_vectype (loop_vinfo);
-  if (!ok)
-    {
-      if (dump_enabled_p ())
-	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
-			 "cannot determine vector types.\n");
-      return ok;
-    }
-
   /* Compute the scalar iteration cost.  */
   vect_compute_single_scalar_iteration_cost (loop_vinfo);
 
@@ -2512,9 +2341,8 @@ start_over:
   if (!vect_make_slp_decision (loop_vinfo))
     return opt_result::failure_at (vect_location, "no stmts to vectorize.\n");
 
-  /* Find stmts that need to be both vectorized and SLPed.  */
-  if (!vect_detect_hybrid_slp (loop_vinfo))
-    return opt_result::failure_at (vect_location, "needs non-SLP handling\n");
+  if (dump_enabled_p ())
+    dump_printf_loc (MSG_NOTE, vect_location, "Loop contains only SLP stmts\n");
 
   /* Determine the vectorization factor from the SLP decision.  */
   LOOP_VINFO_VECT_FACTOR (loop_vinfo)
@@ -2923,7 +2751,7 @@ again:
 	   !gsi_end_p (si); gsi_next (&si))
 	{
 	  stmt_vec_info stmt_info = loop_vinfo->lookup_stmt (gsi_stmt (si));
-	  STMT_SLP_TYPE (stmt_info) = loop_vect;
+	  STMT_SLP_TYPE (stmt_info) = not_vect;
 	  if (STMT_VINFO_DEF_TYPE (stmt_info) == vect_reduction_def
 	      || STMT_VINFO_DEF_TYPE (stmt_info) == vect_double_reduction_def)
 	    {
@@ -2942,7 +2770,7 @@ again:
 	  if (is_gimple_debug (gsi_stmt (si)))
 	    continue;
 	  stmt_vec_info stmt_info = loop_vinfo->lookup_stmt (gsi_stmt (si));
-	  STMT_SLP_TYPE (stmt_info) = loop_vect;
+	  STMT_SLP_TYPE (stmt_info) = not_vect;
 	  if (STMT_VINFO_IN_PATTERN_P (stmt_info))
 	    {
 	      stmt_vec_info pattern_stmt_info
@@ -2951,11 +2779,11 @@ again:
 		STMT_VINFO_IN_PATTERN_P (stmt_info) = false;
 
 	      gimple *pattern_def_seq = STMT_VINFO_PATTERN_DEF_SEQ (stmt_info);
-	      STMT_SLP_TYPE (pattern_stmt_info) = loop_vect;
+	      STMT_SLP_TYPE (pattern_stmt_info) = not_vect;
 	      for (gimple_stmt_iterator pi = gsi_start (pattern_def_seq);
 		   !gsi_end_p (pi); gsi_next (&pi))
 		STMT_SLP_TYPE (loop_vinfo->lookup_stmt (gsi_stmt (pi)))
-		  = loop_vect;
+		  = not_vect;
 	    }
 	}
     }
@@ -4957,8 +4785,9 @@ have_whole_vector_shift (machine_mode mode)
    See vect_emulate_mixed_dot_prod for the actual sequence used.  */
 
 static bool
-vect_is_emulated_mixed_dot_prod (stmt_vec_info stmt_info)
+vect_is_emulated_mixed_dot_prod (slp_tree slp_node)
 {
+  stmt_vec_info stmt_info = SLP_TREE_REPRESENTATIVE (slp_node);
   gassign *assign = dyn_cast<gassign *> (stmt_info->stmt);
   if (!assign || gimple_assign_rhs_code (assign) != DOT_PROD_EXPR)
     return false;
@@ -4970,7 +4799,7 @@ vect_is_emulated_mixed_dot_prod (stmt_vec_info stmt_info)
 
   gcc_assert (STMT_VINFO_REDUC_VECTYPE_IN (stmt_info));
   return !directly_supported_p (DOT_PROD_EXPR,
-				STMT_VINFO_VECTYPE (stmt_info),
+				SLP_TREE_VECTYPE (slp_node),
 				STMT_VINFO_REDUC_VECTYPE_IN (stmt_info),
 				optab_vector_mixed_sign);
 }
@@ -7119,13 +6948,13 @@ vectorizable_lane_reducing (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
 						       vectype_in);
   gcc_assert (ncopies_for_cost >= 1);
 
-  if (vect_is_emulated_mixed_dot_prod (stmt_info))
+  if (vect_is_emulated_mixed_dot_prod (slp_node))
     {
       /* We need extra two invariants: one that contains the minimum signed
 	 value and one that contains half of its negative.  */
       int prologue_stmts = 2;
       unsigned cost = record_stmt_cost (cost_vec, prologue_stmts,
-					scalar_to_vec, stmt_info, 0,
+					scalar_to_vec, slp_node, 0,
 					vect_prologue);
       if (dump_enabled_p ())
 	dump_printf (MSG_NOTE, "vectorizable_lane_reducing: "
@@ -7135,7 +6964,7 @@ vectorizable_lane_reducing (loop_vec_info loop_vinfo, stmt_vec_info stmt_info,
       ncopies_for_cost *= 4;
     }
 
-  record_stmt_cost (cost_vec, (int) ncopies_for_cost, vector_stmt, stmt_info,
+  record_stmt_cost (cost_vec, (int) ncopies_for_cost, vector_stmt, slp_node,
 		    0, vect_body);
 
   if (LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo))
@@ -8421,7 +8250,7 @@ vect_transform_reduction (loop_vec_info loop_vinfo,
 	}
     }
 
-  bool emulated_mixed_dot_prod = vect_is_emulated_mixed_dot_prod (stmt_info);
+  bool emulated_mixed_dot_prod = vect_is_emulated_mixed_dot_prod (slp_node);
   unsigned num = vec_oprnds[reduc_index == 0 ? 1 : 0].length ();
   unsigned mask_index = 0;
 
@@ -10142,7 +9971,12 @@ vectorizable_induction (loop_vec_info loop_vinfo,
       if (peel_mul)
 	{
 	  if (!step_mul)
-	    step_mul = peel_mul;
+	    {
+	      gcc_assert (!nunits.is_constant ());
+	      step_mul = gimple_build (&init_stmts,
+				       MINUS_EXPR, step_vectype,
+				       build_zero_cst (step_vectype), peel_mul);
+	    }
 	  else
 	    step_mul = gimple_build (&init_stmts,
 				     MINUS_EXPR, step_vectype,

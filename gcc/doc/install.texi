@@ -393,7 +393,7 @@ Note binutils 2.35 or newer is required for LTO to work correctly
 with GNU libtool that includes doing a bootstrap with LTO enabled.
 
 @item gzip version 1.2.4 (or later) or
-@itemx bzip2 version 1.0.2 (or later)
+@itemx xz version 5.0 (or later)
 
 Necessary to uncompress GCC @command{tar} files when source code is
 obtained via HTTPS mirror sites.
@@ -1887,8 +1887,8 @@ Produce code conforming to version 20191213.
 In the absence of this configuration option the default version is 20191213.
 
 @item --enable-__cxa_atexit
-Define if you want to use @code{__cxa_atexit}, rather than atexit, to
-register C++ destructors for local statics and global objects.
+Define if you want to use @code{__cxa_atexit}, rather than @code{atexit},
+to register C++ destructors for local statics and global objects.
 This is essential for fully standards-compliant handling of
 destructors, but requires @code{__cxa_atexit} in libc.  This option is
 currently only available on systems with GNU libc.  When enabled, this

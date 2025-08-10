@@ -1542,18 +1542,18 @@
 	  UNSPEC_LD1_GATHER))]
   "TARGET_SVE && TARGET_NON_STREAMING"
   {@ [cons: =0, 1, 2, 3, 4, 5  ]
-     [&w, Z,   w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%2.s]
-     [?w, Z,   0, Ui1, Ui1, Upl] ^
-     [&w, vgw, w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%2.s, #%1]
-     [?w, vgw, 0, Ui1, Ui1, Upl] ^
-     [&w, rk,  w, Z,   Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw]
-     [?w, rk,  0, Z,   Ui1, Upl] ^
-     [&w, rk,  w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw]
-     [?w, rk,  0, Ui1, Ui1, Upl] ^
-     [&w, rk,  w, Z,   i,   Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
-     [?w, rk,  0, Z,   i,   Upl] ^
-     [&w, rk,  w, Ui1, i,   Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw %p4]
-     [?w, rk,  0, Ui1, i,   Upl] ^
+     [&w, Z,          w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%2.s]
+     [?w, Z,          0, Ui1, Ui1, Upl] ^
+     [&w, vg<Vesize>, w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%2.s, #%1]
+     [?w, vg<Vesize>, 0, Ui1, Ui1, Upl] ^
+     [&w, rk,         w, Z,   Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw]
+     [?w, rk,         0, Z,   Ui1, Upl] ^
+     [&w, rk,         w, Ui1, Ui1, Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw]
+     [?w, rk,         0, Ui1, Ui1, Upl] ^
+     [&w, rk,         w, Z,   i,   Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, sxtw %p4]
+     [?w, rk,         0, Z,   i,   Upl] ^
+     [&w, rk,         w, Ui1, i,   Upl] ld1<Vesize>\t%0.s, %5/z, [%1, %2.s, uxtw %p4]
+     [?w, rk,         0, Ui1, i,   Upl] ^
   }
 )
 
@@ -1572,14 +1572,14 @@
 	  UNSPEC_LD1_GATHER))]
   "TARGET_SVE && TARGET_NON_STREAMING"
   {@ [cons: =0, 1, 2, 3, 4, 5]
-     [&w, Z,   w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%2.d]
-     [?w, Z,   0, i, Ui1, Upl] ^
-     [&w, vgd, w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%2.d, #%1]
-     [?w, vgd, 0, i, Ui1, Upl] ^
-     [&w, rk,  w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d]
-     [?w, rk,  0, i, Ui1, Upl] ^
-     [&w, rk,  w, i, i,   Upl] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, lsl %p4]
-     [?w, rk,  0, i, i,   Upl] ^
+     [&w, Z,          w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%2.d]
+     [?w, Z,          0, i, Ui1, Upl] ^
+     [&w, vg<Vesize>, w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%2.d, #%1]
+     [?w, vg<Vesize>, 0, i, Ui1, Upl] ^
+     [&w, rk,         w, i, Ui1, Upl] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d]
+     [?w, rk,         0, i, Ui1, Upl] ^
+     [&w, rk,         w, i, i,   Upl] ld1<Vesize>\t%0.d, %5/z, [%1, %2.d, lsl %p4]
+     [?w, rk,         0, i, i,   Upl] ^
   }
 )
 
@@ -2488,13 +2488,13 @@
 	   (match_operand:SVE_4 4 "register_operand")]
 	  UNSPEC_ST1_SCATTER))]
   "TARGET_SVE && TARGET_NON_STREAMING"
-  {@ [ cons: 0 , 1 , 2   , 3   , 4 , 5    ]
-     [ Z       , w , Ui1 , Ui1 , w , Upl  ] st1<Vesize>\t%4.s, %5, [%1.s]
-     [ vgw     , w , Ui1 , Ui1 , w , Upl  ] st1<Vesize>\t%4.s, %5, [%1.s, #%0]
-     [ rk      , w , Z   , Ui1 , w , Upl  ] st1<Vesize>\t%4.s, %5, [%0, %1.s, sxtw]
-     [ rk      , w , Ui1 , Ui1 , w , Upl  ] st1<Vesize>\t%4.s, %5, [%0, %1.s, uxtw]
-     [ rk      , w , Z   , i   , w , Upl  ] st1<Vesize>\t%4.s, %5, [%0, %1.s, sxtw %p3]
-     [ rk      , w , Ui1 , i   , w , Upl  ] st1<Vesize>\t%4.s, %5, [%0, %1.s, uxtw %p3]
+  {@ [ cons: 0    , 1 , 2   , 3   , 4 , 5    ]
+     [ Z          , w , Ui1 , Ui1 , w , Upl  ] st1<Vesize>\t%4.s, %5, [%1.s]
+     [ vg<Vesize> , w , Ui1 , Ui1 , w , Upl  ] st1<Vesize>\t%4.s, %5, [%1.s, #%0]
+     [ rk         , w , Z   , Ui1 , w , Upl  ] st1<Vesize>\t%4.s, %5, [%0, %1.s, sxtw]
+     [ rk         , w , Ui1 , Ui1 , w , Upl  ] st1<Vesize>\t%4.s, %5, [%0, %1.s, uxtw]
+     [ rk         , w , Z   , i   , w , Upl  ] st1<Vesize>\t%4.s, %5, [%0, %1.s, sxtw %p3]
+     [ rk         , w , Ui1 , i   , w , Upl  ] st1<Vesize>\t%4.s, %5, [%0, %1.s, uxtw %p3]
   }
 )
 
@@ -2511,11 +2511,11 @@
 	   (match_operand:SVE_2 4 "register_operand")]
 	  UNSPEC_ST1_SCATTER))]
   "TARGET_SVE && TARGET_NON_STREAMING"
-  {@ [ cons: 0 , 1 , 3   , 4 , 5    ]
-     [ Z       , w , Ui1 , w , Upl  ] st1<Vesize>\t%4.d, %5, [%1.d]
-     [ vgd     , w , Ui1 , w , Upl  ] st1<Vesize>\t%4.d, %5, [%1.d, #%0]
-     [ rk      , w , Ui1 , w , Upl  ] st1<Vesize>\t%4.d, %5, [%0, %1.d]
-     [ rk      , w , i   , w , Upl  ] st1<Vesize>\t%4.d, %5, [%0, %1.d, lsl %p3]
+  {@ [ cons: 0    , 1 , 3   , 4 , 5    ]
+     [ Z          , w , Ui1 , w , Upl  ] st1<Vesize>\t%4.d, %5, [%1.d]
+     [ vg<Vesize> , w , Ui1 , w , Upl  ] st1<Vesize>\t%4.d, %5, [%1.d, #%0]
+     [ rk         , w , Ui1 , w , Upl  ] st1<Vesize>\t%4.d, %5, [%0, %1.d]
+     [ rk         , w , i   , w , Upl  ] st1<Vesize>\t%4.d, %5, [%0, %1.d, lsl %p3]
   }
 )
 
@@ -2990,10 +2990,7 @@
 	(vec_duplicate:PRED_ALL (match_operand:QI 1 "register_operand")))]
   "TARGET_SVE"
   {
-    rtx tmp = gen_reg_rtx (DImode);
-    rtx op1 = gen_lowpart (DImode, operands[1]);
-    emit_insn (gen_ashldi3 (tmp, op1, gen_int_mode (63, DImode)));
-    emit_insn (gen_while_ultdi<mode> (operands[0], const0_rtx, tmp));
+    aarch64_emit_sve_pred_vec_duplicate (<MODE>mode, operands[0], operands[1]);
     DONE;
   }
 )
@@ -8361,6 +8358,71 @@
   }
 )
 
+;; Likewise, but yield a VNx16BI result regardless of the element width.
+;; The .b case is equivalent to the above.
+(define_expand "@aarch64_pred_cmp<cmp_op><mode>_acle"
+  [(parallel
+     [(set (match_operand:<VPRED> 0 "register_operand")
+	   (unspec:<VPRED>
+	     [(match_operand:<VPRED> 1 "register_operand")
+	      (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	      (SVE_INT_CMP:<VPRED>
+		(match_operand:VNx16QI_ONLY 3 "register_operand")
+		(match_operand:VNx16QI_ONLY 4 "aarch64_sve_cmp_<sve_imm_con>_operand"))]
+	     UNSPEC_PRED_Z))
+      (clobber (reg:CC_NZC CC_REGNUM))])]
+  "TARGET_SVE"
+)
+
+;; For wider elements, bitcast the predicate result to a VNx16BI and use
+;; an (and ...) to indicate that only every second, fourth, or eighth bit
+;; is set.
+(define_expand "@aarch64_pred_cmp<cmp_op><mode>_acle"
+  [(parallel
+     [(set (match_operand:VNx16BI 0 "register_operand")
+	   (and:VNx16BI
+	     (subreg:VNx16BI
+	       (unspec:<VPRED>
+		 [(match_operand:<VPRED> 1 "register_operand")
+		  (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+		  (SVE_INT_CMP:<VPRED>
+		    (match_operand:SVE_FULL_HSDI 3 "register_operand")
+		    (match_operand:SVE_FULL_HSDI 4 "aarch64_sve_cmp_<sve_imm_con>_operand"))]
+		 UNSPEC_PRED_Z)
+	       0)
+	     (match_dup 5)))
+      (clobber (reg:CC_NZC CC_REGNUM))])]
+  "TARGET_SVE"
+  {
+    operands[5] = aarch64_ptrue_all (GET_MODE_UNIT_SIZE (<MODE>mode));
+  }
+)
+
+(define_insn "*aarch64_pred_cmp<cmp_op><mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_operand:<VPRED> 1 "register_operand")
+	       (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	       (SVE_INT_CMP:<VPRED>
+		 (match_operand:SVE_FULL_HSDI 3 "register_operand")
+		 (match_operand:SVE_FULL_HSDI 4 "aarch64_sve_cmp_<sve_imm_con>_operand"))]
+	      UNSPEC_PRED_Z)
+	    0)
+	  (match_operand:<VPRED> 5 "aarch64_ptrue_all_operand")))
+   (clobber (reg:CC_NZC CC_REGNUM))]
+  "TARGET_SVE"
+  {@ [ cons: =0 , 1  , 3 , 4            ; attrs: pred_clobber ]
+     [ &Upa     , Upl, w , <sve_imm_con>; yes                 ] cmp<cmp_op>\t%0.<Vetype>, %1/z, %3.<Vetype>, #%4
+     [ ?Upl     , 0  , w , <sve_imm_con>; yes                 ] ^
+     [ Upa      , Upl, w , <sve_imm_con>; no                  ] ^
+     [ &Upa     , Upl, w , w            ; yes                 ] cmp<cmp_op>\t%0.<Vetype>, %1/z, %3.<Vetype>, %4.<Vetype>
+     [ ?Upl     , 0  , w , w            ; yes                 ] ^
+     [ Upa      , Upl, w , w            ; no                  ] ^
+  }
+)
+
 ;; Predicated integer comparisons in which both the flag and predicate
 ;; results are interesting.
 (define_insn_and_rewrite "*cmp<cmp_op><mode>_cc"
@@ -8385,6 +8447,49 @@
 	     (match_dup 2)
 	     (match_dup 3))]
 	  UNSPEC_PRED_Z))]
+  "TARGET_SVE
+   && aarch64_sve_same_pred_for_ptest_p (&operands[4], &operands[6])"
+  {@ [ cons: =0 , 1   , 2 , 3            ; attrs: pred_clobber ]
+     [ &Upa     ,  Upl, w , <sve_imm_con>; yes                 ] cmp<cmp_op>\t%0.<Vetype>, %1/z, %2.<Vetype>, #%3
+     [ ?Upl     ,  0  , w , <sve_imm_con>; yes                 ] ^
+     [ Upa      ,  Upl, w , <sve_imm_con>; no                  ] ^
+     [ &Upa     ,  Upl, w , w            ; yes                 ] cmp<cmp_op>\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.<Vetype>
+     [ ?Upl     ,  0  , w , w            ; yes                 ] ^
+     [ Upa      ,  Upl, w , w            ; no                  ] ^
+  }
+  "&& !rtx_equal_p (operands[4], operands[6])"
+  {
+    operands[6] = copy_rtx (operands[4]);
+    operands[7] = operands[5];
+  }
+)
+
+(define_insn_and_rewrite "*cmp<cmp_op><mode>_acle_cc"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand:VNx16BI 1 "register_operand")
+	   (match_operand 4)
+	   (match_operand:SI 5 "aarch64_sve_ptrue_flag")
+	   (unspec:<VPRED>
+	     [(match_operand 6)
+	      (match_operand:SI 7 "aarch64_sve_ptrue_flag")
+	      (SVE_INT_CMP:<VPRED>
+		(match_operand:SVE_FULL_HSDI 2 "register_operand")
+		(match_operand:SVE_FULL_HSDI 3 "aarch64_sve_cmp_<sve_imm_con>_operand"))]
+	     UNSPEC_PRED_Z)]
+	  UNSPEC_PTEST))
+   (set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_dup 6)
+	       (match_dup 7)
+	       (SVE_INT_CMP:<VPRED>
+		 (match_dup 2)
+		 (match_dup 3))]
+	      UNSPEC_PRED_Z)
+	    0)
+	  (match_operand:<VPRED> 8 "aarch64_ptrue_all_operand")))]
   "TARGET_SVE
    && aarch64_sve_same_pred_for_ptest_p (&operands[4], &operands[6])"
   {@ [ cons: =0 , 1   , 2 , 3            ; attrs: pred_clobber ]
@@ -8467,14 +8572,52 @@
       (clobber (reg:CC_NZC CC_REGNUM))])]
 )
 
+(define_insn_and_split "*cmp<cmp_op><mode>_acle_and"
+  [(set (match_operand:VNx16BI 0 "register_operand" "=Upa, Upa")
+	(and:VNx16BI
+	  (and:VNx16BI
+	    (subreg:VNx16BI
+	      (unspec:<VPRED>
+		[(match_operand 4)
+		 (const_int SVE_KNOWN_PTRUE)
+		 (SVE_INT_CMP:<VPRED>
+		   (match_operand:SVE_FULL_HSDI 2 "register_operand" "w, w")
+		   (match_operand:SVE_FULL_HSDI 3 "aarch64_sve_cmp_<sve_imm_con>_operand" "<sve_imm_con>, w"))]
+		UNSPEC_PRED_Z)
+	      0)
+	    (match_operand:VNx16BI 1 "register_operand" "Upl, Upl"))
+          (match_operand:<VPRED> 5 "aarch64_ptrue_all_operand")))
+   (clobber (reg:CC_NZC CC_REGNUM))]
+  "TARGET_SVE"
+  "#"
+  "&& 1"
+  [(parallel
+     [(set (match_dup 0)
+	   (and:VNx16BI
+	     (subreg:VNx16BI
+	       (unspec:<VPRED>
+		 [(match_dup 1)
+		  (const_int SVE_MAYBE_NOT_PTRUE)
+		  (SVE_INT_CMP:<VPRED>
+		    (match_dup 2)
+		    (match_dup 3))]
+		 UNSPEC_PRED_Z)
+	       0)
+	     (match_dup 5)))
+      (clobber (reg:CC_NZC CC_REGNUM))])]
+  {
+    operands[1] = gen_lowpart (<VPRED>mode, operands[1]);
+  }
+)
+
 ;; Predicated integer wide comparisons.
 (define_insn "@aarch64_pred_cmp<cmp_op><mode>_wide"
   [(set (match_operand:<VPRED> 0 "register_operand")
 	(unspec:<VPRED>
-	  [(match_operand:VNx16BI 1 "register_operand")
+	  [(match_operand:<VPRED> 1 "register_operand")
 	   (match_operand:SI 2 "aarch64_sve_ptrue_flag")
 	   (unspec:<VPRED>
-	     [(match_operand:SVE_FULL_BHSI 3 "register_operand")
+	     [(match_operand:VNx16QI_ONLY 3 "register_operand")
 	      (match_operand:VNx2DI 4 "register_operand")]
 	     SVE_COND_INT_CMP_WIDE)]
 	  UNSPEC_PRED_Z))
@@ -8487,16 +8630,61 @@
   }
 )
 
+(define_expand "@aarch64_pred_cmp<cmp_op><mode>_wide"
+  [(parallel
+     [(set (match_operand:VNx16BI 0 "register_operand")
+	   (and:VNx16BI
+	     (subreg:VNx16BI
+	       (unspec:<VPRED>
+		 [(match_operand:<VPRED> 1 "register_operand")
+		  (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+		  (unspec:<VPRED>
+		    [(match_operand:SVE_FULL_HSI 3 "register_operand")
+		     (match_operand:VNx2DI 4 "register_operand")]
+		    SVE_COND_INT_CMP_WIDE)]
+		 UNSPEC_PRED_Z)
+	       0)
+	     (match_dup 5)))
+      (clobber (reg:CC_NZC CC_REGNUM))])]
+  "TARGET_SVE"
+  {
+    operands[5] = aarch64_ptrue_all (GET_MODE_UNIT_SIZE (<MODE>mode));
+  }
+)
+
+(define_insn "*aarch64_pred_cmp<cmp_op><mode>_wide"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_operand:<VPRED> 1 "register_operand")
+	       (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	       (unspec:<VPRED>
+		 [(match_operand:SVE_FULL_HSI 3 "register_operand")
+		  (match_operand:VNx2DI 4 "register_operand")]
+		 SVE_COND_INT_CMP_WIDE)]
+	      UNSPEC_PRED_Z)
+	    0)
+	  (match_operand:<VPRED> 5 "aarch64_ptrue_all_operand")))
+   (clobber (reg:CC_NZC CC_REGNUM))]
+  "TARGET_SVE"
+  {@ [ cons: =0, 1   , 2, 3, 4; attrs: pred_clobber ]
+     [ &Upa    ,  Upl,  , w, w; yes                 ] cmp<cmp_op>\t%0.<Vetype>, %1/z, %3.<Vetype>, %4.d
+     [ ?Upl    ,  0  ,  , w, w; yes                 ] ^
+     [ Upa     ,  Upl,  , w, w; no                  ] ^
+  }
+)
+
 ;; Predicated integer wide comparisons in which both the flag and
 ;; predicate results are interesting.
-(define_insn "*aarch64_pred_cmp<cmp_op><mode>_wide_cc"
+(define_insn_and_rewrite "*aarch64_pred_cmp<cmp_op><mode>_wide_cc"
   [(set (reg:CC_NZC CC_REGNUM)
 	(unspec:CC_NZC
 	  [(match_operand:VNx16BI 1 "register_operand")
 	   (match_operand 4)
 	   (match_operand:SI 5 "aarch64_sve_ptrue_flag")
 	   (unspec:<VPRED>
-	     [(match_operand:VNx16BI 6 "register_operand")
+	     [(match_operand:<VPRED> 6 "register_operand")
 	      (match_operand:SI 7 "aarch64_sve_ptrue_flag")
 	      (unspec:<VPRED>
 		[(match_operand:SVE_FULL_BHSI 2 "register_operand")
@@ -8520,18 +8708,65 @@
      [ ?Upl    ,  0  , w, w, Upl; yes                 ] ^
      [ Upa     ,  Upl, w, w, Upl; no                  ] ^
   }
+  "&& !rtx_equal_p (operands[4], operands[6])"
+  {
+    operands[6] = copy_rtx (operands[4]);
+    operands[7] = operands[5];
+  }
 )
 
-;; Predicated integer wide comparisons in which only the flags result
-;; is interesting.
-(define_insn "*aarch64_pred_cmp<cmp_op><mode>_wide_ptest"
+(define_insn_and_rewrite "*aarch64_pred_cmp<cmp_op><mode>_wide_cc"
   [(set (reg:CC_NZC CC_REGNUM)
 	(unspec:CC_NZC
 	  [(match_operand:VNx16BI 1 "register_operand")
 	   (match_operand 4)
 	   (match_operand:SI 5 "aarch64_sve_ptrue_flag")
 	   (unspec:<VPRED>
-	     [(match_operand:VNx16BI 6 "register_operand")
+	     [(match_operand:<VPRED> 6 "register_operand")
+	      (match_operand:SI 7 "aarch64_sve_ptrue_flag")
+	      (unspec:<VPRED>
+		[(match_operand:SVE_FULL_HSI 2 "register_operand")
+		 (match_operand:VNx2DI 3 "register_operand")]
+		SVE_COND_INT_CMP_WIDE)]
+	     UNSPEC_PRED_Z)]
+	  UNSPEC_PTEST))
+   (set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_dup 6)
+	       (match_dup 7)
+	       (unspec:<VPRED>
+		 [(match_dup 2)
+		  (match_dup 3)]
+		 SVE_COND_INT_CMP_WIDE)]
+	      UNSPEC_PRED_Z)
+	    0)
+	  (match_operand:<VPRED> 8 "aarch64_ptrue_all_operand")))]
+  "TARGET_SVE
+   && aarch64_sve_same_pred_for_ptest_p (&operands[4], &operands[6])"
+  {@ [ cons: =0, 1   , 2, 3, 6  ; attrs: pred_clobber ]
+     [ &Upa    ,  Upl, w, w, Upl; yes                 ] cmp<cmp_op>\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.d
+     [ ?Upl    ,  0  , w, w, Upl; yes                 ] ^
+     [ Upa     ,  Upl, w, w, Upl; no                  ] ^
+  }
+  "&& !rtx_equal_p (operands[4], operands[6])"
+  {
+    operands[6] = copy_rtx (operands[4]);
+    operands[7] = operands[5];
+  }
+)
+
+;; Predicated integer wide comparisons in which only the flags result
+;; is interesting.
+(define_insn_and_rewrite "*aarch64_pred_cmp<cmp_op><mode>_wide_ptest"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand:VNx16BI 1 "register_operand")
+	   (match_operand 4)
+	   (match_operand:SI 5 "aarch64_sve_ptrue_flag")
+	   (unspec:<VPRED>
+	     [(match_operand:<VPRED> 6 "register_operand")
 	      (match_operand:SI 7 "aarch64_sve_ptrue_flag")
 	      (unspec:<VPRED>
 		[(match_operand:SVE_FULL_BHSI 2 "register_operand")
@@ -8546,6 +8781,11 @@
      [ &Upa     ,  Upl, w, w, Upl; yes                 ] cmp<cmp_op>\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.d
      [ ?Upl     ,  0  , w, w, Upl; yes                 ] ^
      [ Upa      ,  Upl, w, w, Upl; no                  ] ^
+  }
+  "&& !rtx_equal_p (operands[4], operands[6])"
+  {
+    operands[6] = copy_rtx (operands[4]);
+    operands[7] = operands[5];
   }
 )
 
@@ -8584,6 +8824,58 @@
   "while<cmp_op>\t%0.<PRED_ALL:Vetype>, %<w>1, %<w>2"
 )
 
+;; Likewise, but yield a VNx16BI result regardless of the element width.
+;; The .b case is equivalent to the above.
+(define_expand "@aarch64_sve_while_<while_optab_cmp><GPI:mode><VNx16BI_ONLY:mode>_acle"
+  [(parallel
+     [(set (match_operand:VNx16BI_ONLY 0 "register_operand")
+	   (unspec:VNx16BI_ONLY
+	     [(const_int SVE_WHILE_B)
+	      (match_operand:GPI 1 "aarch64_reg_or_zero")
+	      (match_operand:GPI 2 "aarch64_reg_or_zero")]
+	     SVE_WHILE))
+      (clobber (reg:CC_NZC CC_REGNUM))])]
+  "TARGET_SVE"
+)
+
+;; For wider elements, bitcast the predicate result to a VNx16BI and use
+;; an (and ...) to indicate that only every second, fourth, or eighth bit
+;; is set.
+(define_expand "@aarch64_sve_while_<while_optab_cmp><GPI:mode><PRED_HSD:mode>_acle"
+  [(parallel
+     [(set (match_operand:VNx16BI 0 "register_operand")
+	   (and:VNx16BI
+	     (subreg:VNx16BI
+	       (unspec:PRED_HSD
+		 [(const_int SVE_WHILE_B)
+		  (match_operand:GPI 1 "aarch64_reg_or_zero")
+		  (match_operand:GPI 2 "aarch64_reg_or_zero")]
+		 SVE_WHILE)
+	       0)
+	     (match_dup 3)))
+      (clobber (reg:CC_NZC CC_REGNUM))])]
+  "TARGET_SVE"
+  {
+    operands[3] = aarch64_ptrue_all (<data_bytes>);
+  }
+)
+
+(define_insn "*aarch64_sve_while_<while_optab_cmp><GPI:mode><PRED_HSD:mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:PRED_HSD
+	      [(const_int SVE_WHILE_B)
+	       (match_operand:GPI 1 "aarch64_reg_or_zero" "rZ")
+	       (match_operand:GPI 2 "aarch64_reg_or_zero" "rZ")]
+	      SVE_WHILE)
+	    0)
+	  (match_operand:PRED_HSD 3 "aarch64_ptrue_all_operand")))
+   (clobber (reg:CC_NZC CC_REGNUM))]
+  "TARGET_SVE"
+  "while<cmp_op>\t%0.<PRED_HSD:Vetype>, %<w>1, %<w>2"
+)
+
 ;; The WHILE instructions set the flags in the same way as a PTEST with
 ;; a PTRUE GP.  Handle the case in which both results are useful.  The GP
 ;; operands to the PTEST aren't needed, so we allow them to be anything.
@@ -8612,6 +8904,38 @@
   {
     operands[3] = CONSTM1_RTX (VNx16BImode);
     operands[4] = CONSTM1_RTX (<PRED_ALL:MODE>mode);
+  }
+)
+
+(define_insn_and_rewrite "*while_<while_optab_cmp><GPI:mode><PRED_HSD:mode>_acle_cc"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand 3)
+	   (match_operand 4)
+	   (const_int SVE_KNOWN_PTRUE)
+	   (unspec:PRED_HSD
+	     [(const_int SVE_WHILE_B)
+	      (match_operand:GPI 1 "aarch64_reg_or_zero" "rZ")
+	      (match_operand:GPI 2 "aarch64_reg_or_zero" "rZ")]
+	     SVE_WHILE)]
+	  UNSPEC_PTEST))
+   (set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:PRED_HSD [(const_int SVE_WHILE_B)
+			      (match_dup 1)
+			      (match_dup 2)]
+			     SVE_WHILE)
+	    0)
+	  (match_operand:PRED_HSD 5 "aarch64_ptrue_all_operand")))]
+  "TARGET_SVE"
+  "while<cmp_op>\t%0.<PRED_HSD:Vetype>, %<w>1, %<w>2"
+  ;; Force the compiler to drop the unused predicate operand, so that we
+  ;; don't have an unnecessary PTRUE.
+  "&& (!CONSTANT_P (operands[3]) || !CONSTANT_P (operands[4]))"
+  {
+    operands[3] = CONSTM1_RTX (VNx16BImode);
+    operands[4] = CONSTM1_RTX (<PRED_HSD:MODE>mode);
   }
 )
 
@@ -8685,6 +9009,43 @@
   }
 )
 
+(define_expand "@aarch64_pred_fcm<cmp_op><mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_operand:<VPRED> 1 "aarch64_predicate_operand")
+	       (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	       (match_operand:SVE_F 3 "register_operand")
+	       (match_operand:SVE_F 4 "aarch64_simd_reg_or_zero")]
+	      SVE_COND_FP_CMP_I0)
+	    0)
+	  (match_dup 5)))]
+  "TARGET_SVE"
+  {
+    operands[5] = aarch64_ptrue_all (GET_MODE_UNIT_SIZE (<MODE>mode));
+  }
+)
+
+(define_insn "*aarch64_pred_fcm<cmp_op><mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_operand:<VPRED> 1 "aarch64_predicate_operand")
+	       (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	       (match_operand:SVE_F 3 "register_operand")
+	       (match_operand:SVE_F 4 "aarch64_simd_reg_or_zero")]
+	      SVE_COND_FP_CMP_I0)
+	    0)
+	  (match_operand:<VPRED> 5 "aarch64_ptrue_all_operand")))]
+  "TARGET_SVE"
+  {@ [ cons: =0 , 1   , 3 , 4   ]
+     [ Upa      , Upl , w , Dz  ] fcm<cmp_op>\t%0.<Vetype>, %1/z, %3.<Vetype>, #0.0
+     [ Upa      , Upl , w , w   ] fcm<cmp_op>\t%0.<Vetype>, %1/z, %3.<Vetype>, %4.<Vetype>
+  }
+)
+
 ;; Same for unordered comparisons.
 (define_insn "@aarch64_pred_fcmuo<mode>"
   [(set (match_operand:<VPRED> 0 "register_operand" "=Upa")
@@ -8694,6 +9055,40 @@
 	   (match_operand:SVE_F 3 "register_operand" "w")
 	   (match_operand:SVE_F 4 "register_operand" "w")]
 	  UNSPEC_COND_FCMUO))]
+  "TARGET_SVE"
+  "fcmuo\t%0.<Vetype>, %1/z, %3.<Vetype>, %4.<Vetype>"
+)
+
+(define_expand "@aarch64_pred_fcmuo<mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_operand:<VPRED> 1 "aarch64_predicate_operand")
+	       (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	       (match_operand:SVE_F 3 "register_operand")
+	       (match_operand:SVE_F 4 "register_operand")]
+	      UNSPEC_COND_FCMUO)
+	    0)
+	  (match_dup 5)))]
+  "TARGET_SVE"
+  {
+    operands[5] = aarch64_ptrue_all (GET_MODE_UNIT_SIZE (<MODE>mode));
+  }
+)
+
+(define_insn "*aarch64_pred_fcmuo<mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_operand:<VPRED> 1 "aarch64_predicate_operand" "Upl")
+	       (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	       (match_operand:SVE_F 3 "register_operand" "w")
+	       (match_operand:SVE_F 4 "register_operand" "w")]
+	      UNSPEC_COND_FCMUO)
+	    0)
+	  (match_operand:<VPRED> 5 "aarch64_ptrue_all_operand")))]
   "TARGET_SVE"
   "fcmuo\t%0.<Vetype>, %1/z, %3.<Vetype>, %4.<Vetype>"
 )
@@ -8916,23 +9311,30 @@
 ;; -------------------------------------------------------------------------
 
 ;; Predicated floating-point absolute comparisons.
-(define_expand "@aarch64_pred_fac<cmp_op><mode>"
-  [(set (match_operand:<VPRED> 0 "register_operand")
-	(unspec:<VPRED>
-	  [(match_operand:<VPRED> 1 "register_operand")
-	   (match_operand:SI 2 "aarch64_sve_ptrue_flag")
-	   (unspec:SVE_FULL_F
-	     [(match_dup 1)
-	      (match_dup 2)
-	      (match_operand:SVE_FULL_F 3 "register_operand")]
-	     UNSPEC_COND_FABS)
-	   (unspec:SVE_FULL_F
-	     [(match_dup 1)
-	      (match_dup 2)
-	      (match_operand:SVE_FULL_F 4 "register_operand")]
-	     UNSPEC_COND_FABS)]
-	  SVE_COND_FP_ABS_CMP))]
+(define_expand "@aarch64_pred_fac<cmp_op><mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_operand:<VPRED> 1 "register_operand")
+	       (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	       (unspec:SVE_FULL_F
+		 [(match_dup 1)
+		  (match_dup 2)
+		  (match_operand:SVE_FULL_F 3 "register_operand")]
+		 UNSPEC_COND_FABS)
+	       (unspec:SVE_FULL_F
+		 [(match_dup 1)
+		  (match_dup 2)
+		  (match_operand:SVE_FULL_F 4 "register_operand")]
+		 UNSPEC_COND_FABS)]
+	      SVE_COND_FP_ABS_CMP)
+	    0)
+	  (match_dup 5)))]
   "TARGET_SVE"
+  {
+    operands[5] = aarch64_ptrue_all (GET_MODE_UNIT_SIZE (<MODE>mode));
+  }
 )
 
 (define_insn_and_rewrite "*aarch64_pred_fac<cmp_op><mode>_relaxed"
@@ -8977,6 +9379,30 @@
 	      (match_operand:SVE_FULL_F 3 "register_operand" "w")]
 	     UNSPEC_COND_FABS)]
 	  SVE_COND_FP_ABS_CMP))]
+  "TARGET_SVE"
+  "fac<cmp_op>\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.<Vetype>"
+)
+
+(define_insn "*aarch64_pred_fac<cmp_op><mode>_strict_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:<VPRED>
+	      [(match_operand:<VPRED> 1 "register_operand" "Upl")
+	       (match_operand:SI 4 "aarch64_sve_ptrue_flag")
+	       (unspec:SVE_FULL_F
+		 [(match_dup 1)
+		  (match_operand:SI 5 "aarch64_sve_gp_strictness")
+		  (match_operand:SVE_FULL_F 2 "register_operand" "w")]
+		 UNSPEC_COND_FABS)
+	       (unspec:SVE_FULL_F
+		 [(match_dup 1)
+		  (match_operand:SI 6 "aarch64_sve_gp_strictness")
+		  (match_operand:SVE_FULL_F 3 "register_operand" "w")]
+		 UNSPEC_COND_FABS)]
+	      SVE_COND_FP_ABS_CMP)
+	    0)
+	  (match_operand:<VPRED> 7 "aarch64_ptrue_all_operand")))]
   "TARGET_SVE"
   "fac<cmp_op>\t%0.<Vetype>, %1/z, %2.<Vetype>, %3.<Vetype>"
 )
@@ -9429,7 +9855,30 @@
 	(unspec:PRED_ALL [(match_operand:PRED_ALL 1 "register_operand" "Upa")]
 			 UNSPEC_REV))]
   "TARGET_SVE"
-  "rev\t%0.<Vetype>, %1.<Vetype>")
+  "rev\t%0.<Vetype>, %1.<Vetype>"
+)
+
+(define_expand "@aarch64_sve_rev<mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(unspec:VNx16BI
+	  [(match_operand:VNx16BI 1 "register_operand")
+	   (match_dup:PRED_ALL 2)]
+	  UNSPEC_REV_PRED))]
+  "TARGET_SVE"
+  {
+    operands[2] = CONST0_RTX (<MODE>mode);
+  }
+)
+
+(define_insn "*aarch64_sve_rev<mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(unspec:VNx16BI
+	  [(match_operand:VNx16BI 1 "register_operand" "Upa")
+	   (match_operand:PRED_ALL 2 "aarch64_simd_imm_zero")]
+	  UNSPEC_REV_PRED))]
+  "TARGET_SVE"
+  "rev\t%0.<Vetype>, %1.<Vetype>"
+)
 
 ;; -------------------------------------------------------------------------
 ;; ---- [PRED] Special-purpose binary permutes
@@ -9454,18 +9903,39 @@
   "<perm_insn>\t%0.<Vetype>, %1.<Vetype>, %2.<Vetype>"
 )
 
-;; Special purpose permute used by the predicate generation instructions.
-;; Unlike the normal permute patterns, these instructions operate on VNx16BI
-;; regardless of the element size, so that all input and output bits are
-;; well-defined.  Operand 3 then indicates the size of the permute.
-(define_insn "@aarch64_sve_trn1_conv<mode>"
+;; Special-purpose permutes used by the ACLE intrinsics and predicate
+;; generation instructions.  Unlike the normal permute patterns, these
+;; instructions operate on VNx16BI regardless of the element size, so that
+;; all input and output bits are well-defined.  Operand 3 then indicates
+;; the size of the permute.
+;;
+;; To make generation easier, this pattern embeds the permute type as the
+;; fourth operand to the unspec.  On the one hand, this avoids overloading
+;; unspecs like UNSPEC_ZIP1 to represent two different operations.  On the
+;; other hand, it avoids having a separate unspec for each variant, and
+;; having to map from one kind of unspec to the other.
+(define_expand "@aarch64_sve_<perm_insn><mode>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(unspec:VNx16BI [(match_operand:VNx16BI 1 "register_operand")
+			 (match_operand:VNx16BI 2 "register_operand")
+			 (match_dup:PRED_ALL 3)
+			 (const_int PERMUTE)]
+			UNSPEC_PERMUTE_PRED))]
+  "TARGET_SVE"
+  {
+    operands[3] = CONST0_RTX (<MODE>mode);
+  }
+)
+
+(define_insn "*aarch64_sve_<perm_insn><mode>_acle"
   [(set (match_operand:VNx16BI 0 "register_operand" "=Upa")
 	(unspec:VNx16BI [(match_operand:VNx16BI 1 "register_operand" "Upa")
 			 (match_operand:VNx16BI 2 "register_operand" "Upa")
-			 (match_operand:PRED_ALL 3 "aarch64_simd_imm_zero")]
-			UNSPEC_TRN1_CONV))]
+			 (match_operand:PRED_ALL 3 "aarch64_simd_imm_zero")
+			 (const_int PERMUTE)]
+			UNSPEC_PERMUTE_PRED))]
   "TARGET_SVE"
-  "trn1\t%0.<PRED_ALL:Vetype>, %1.<PRED_ALL:Vetype>, %2.<PRED_ALL:Vetype>"
+  "<perm_insn>\t%0.<PRED_ALL:Vetype>, %1.<PRED_ALL:Vetype>, %2.<PRED_ALL:Vetype>"
 )
 
 ;; =========================================================================
@@ -10454,6 +10924,34 @@
   "punpk<perm_hilo>\t%0.h, %1.b"
 )
 
+(define_expand "@aarch64_sve_punpk<perm_hilo>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:VNx8BI
+	      [(match_operand:VNx16BI 1 "register_operand")]
+	      UNPACK_UNSIGNED)
+	    0)
+	  (match_dup 2)))]
+  "TARGET_SVE"
+  {
+    operands[2] = aarch64_ptrue_all (2);
+  }
+)
+
+(define_insn "*aarch64_sve_punpk<perm_hilo>_acle"
+  [(set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:VNx8BI
+	      [(match_operand:VNx16BI 1 "register_operand" "Upa")]
+	      UNPACK_UNSIGNED)
+	    0)
+	  (match_operand:VNx8BI 2 "aarch64_ptrue_all_operand")))]
+  "TARGET_SVE"
+  "punpk<perm_hilo>\t%0.h, %1.b"
+)
+
 ;; =========================================================================
 ;; == Vector partitioning
 ;; =========================================================================
@@ -10678,14 +11176,49 @@
 ;; -------------------------------------------------------------------------
 
 (define_insn "@aarch64_sve_<sve_pred_op><mode>"
-  [(set (match_operand:PRED_ALL 0 "register_operand" "=Upa")
-	(unspec:PRED_ALL
-	  [(match_operand:PRED_ALL 1 "register_operand" "Upa")
+  [(set (match_operand:VNx16BI_ONLY 0 "register_operand" "=Upa")
+	(unspec:VNx16BI_ONLY
+	  [(match_operand:VNx16BI_ONLY 1 "register_operand" "Upa")
 	   (match_operand:SI 2 "aarch64_sve_ptrue_flag")
-	   (match_operand:PRED_ALL 3 "register_operand" "0")]
+	   (match_operand:VNx16BI_ONLY 3 "register_operand" "0")]
 	  SVE_PITER))
    (clobber (reg:CC_NZC CC_REGNUM))]
-  "TARGET_SVE && <max_elem_bits> >= <elem_bits>"
+  "TARGET_SVE"
+  "<sve_pred_op>\t%0.<Vetype>, %1, %0.<Vetype>"
+)
+
+(define_expand "@aarch64_sve_<sve_pred_op><mode>"
+  [(parallel
+     [(set (match_operand:VNx16BI 0 "register_operand")
+	   (and:VNx16BI
+	     (subreg:VNx16BI
+	       (unspec:PRED_HSD
+		 [(match_operand:PRED_HSD 1 "register_operand")
+		  (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+		  (match_operand:PRED_HSD 3 "register_operand")]
+		 PNEXT_ONLY)
+	       0)
+	     (match_dup 4)))
+      (clobber (reg:CC_NZC CC_REGNUM))])]
+  "TARGET_SVE"
+  {
+    operands[4] = aarch64_ptrue_all (<data_bytes>);
+  }
+)
+
+(define_insn "*aarch64_sve_<sve_pred_op><mode>"
+  [(set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:PRED_HSD
+	      [(match_operand:PRED_HSD 1 "register_operand" "Upa")
+	       (match_operand:SI 2 "aarch64_sve_ptrue_flag")
+	       (match_operand:PRED_HSD 3 "register_operand" "0")]
+	      PNEXT_ONLY)
+	    0)
+	  (match_operand:PRED_HSD 4 "aarch64_ptrue_all_operand")))
+   (clobber (reg:CC_NZC CC_REGNUM))]
+  "TARGET_SVE"
   "<sve_pred_op>\t%0.<Vetype>, %1, %0.<Vetype>"
 )
 
@@ -10710,6 +11243,38 @@
 	  SVE_PITER))]
   "TARGET_SVE
    && <max_elem_bits> >= <elem_bits>
+   && aarch64_sve_same_pred_for_ptest_p (&operands[2], &operands[4])"
+  "<sve_pred_op>\t%0.<Vetype>, %1, %0.<Vetype>"
+  "&& !rtx_equal_p (operands[2], operands[4])"
+  {
+    operands[4] = operands[2];
+    operands[5] = operands[3];
+  }
+)
+
+(define_insn_and_rewrite "*aarch64_sve_<sve_pred_op><mode>_cc"
+  [(set (reg:CC_NZC CC_REGNUM)
+	(unspec:CC_NZC
+	  [(match_operand:VNx16BI 1 "register_operand" "Upa")
+	   (match_operand 2)
+	   (match_operand:SI 3 "aarch64_sve_ptrue_flag")
+	   (unspec:PRED_HSD
+	     [(match_operand 4)
+	      (match_operand:SI 5 "aarch64_sve_ptrue_flag")
+	      (match_operand:PRED_HSD 6 "register_operand" "0")]
+	     PNEXT_ONLY)]
+	  UNSPEC_PTEST))
+   (set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+	(and:VNx16BI
+	  (subreg:VNx16BI
+	    (unspec:PRED_HSD
+	      [(match_dup 4)
+	       (match_dup 5)
+	       (match_dup 6)]
+	      PNEXT_ONLY)
+	    0)
+	  (match_operand:PRED_HSD 7 "aarch64_ptrue_all_operand")))]
+  "TARGET_SVE
    && aarch64_sve_same_pred_for_ptest_p (&operands[2], &operands[4])"
   "<sve_pred_op>\t%0.<Vetype>, %1, %0.<Vetype>"
   "&& !rtx_equal_p (operands[2], operands[4])"

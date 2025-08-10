@@ -455,6 +455,7 @@
 (define_mode_iterator VCVTFPM [V4HF V8HF V4SF])
 
 ;; Iterators for single modes, for "@" patterns.
+(define_mode_iterator VNx16BI_ONLY [VNx16BI])
 (define_mode_iterator VNx16QI_ONLY [VNx16QI])
 (define_mode_iterator VNx16SI_ONLY [VNx16SI])
 (define_mode_iterator VNx8HI_ONLY [VNx8HI])
@@ -541,6 +542,12 @@
 ;; Fully-packed SVE floating-point vector modes that have 16-bit or 32-bit
 ;; elements.
 (define_mode_iterator SVE_FULL_HSF [VNx8HF VNx4SF])
+
+;; Like SVE_FULL_HSF, but selectively enables those modes that are valid
+;; for the variant of the SVE2 FP8 FDOT instruction associated with that
+;; mode.
+(define_mode_iterator SVE_FULL_HSF_FP8_FDOT [(VNx4SF "TARGET_SSVE_FP8DOT4")
+					     (VNx8HF "TARGET_SSVE_FP8DOT2")])
 
 ;; Partial SVE floating-point vector modes that have 16-bit or 32-bit
 ;; elements.
@@ -930,7 +937,6 @@
     UNSPEC_UZP2Q	; Used in aarch64-sve.md.
     UNSPEC_ZIP1Q	; Used in aarch64-sve.md.
     UNSPEC_ZIP2Q	; Used in aarch64-sve.md.
-    UNSPEC_TRN1_CONV	; Used in aarch64-sve.md.
     UNSPEC_COND_CMPEQ_WIDE ; Used in aarch64-sve.md.
     UNSPEC_COND_CMPGE_WIDE ; Used in aarch64-sve.md.
     UNSPEC_COND_CMPGT_WIDE ; Used in aarch64-sve.md.
@@ -1184,6 +1190,9 @@
     UNSPEC_LUTI		; Used in aarch64-simd.md.
     UNSPEC_LUTI2	; Used in aarch64-simd.md.
     UNSPEC_LUTI4	; Used in aarch64-simd.md.
+
+    ;; All used in aarch64-sve.md
+    UNSPEC_PERMUTE_PRED
 
     ;; All used in aarch64-sve2.md
     UNSPEC_ADDQV
@@ -3876,6 +3885,8 @@
 (define_int_iterator SVE_BRK_BINARY [UNSPEC_BRKN UNSPEC_BRKPA UNSPEC_BRKPB])
 
 (define_int_iterator SVE_PITER [UNSPEC_PFIRST UNSPEC_PNEXT])
+
+(define_int_iterator PNEXT_ONLY [UNSPEC_PNEXT])
 
 (define_int_iterator MATMUL [UNSPEC_SMATMUL UNSPEC_UMATMUL
 			     UNSPEC_USMATMUL])

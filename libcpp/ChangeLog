@@ -1,3 +1,34 @@
+2025-08-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/120778
+	* include/cpplib.h (struct cpp_options): Add cpp_warn_keyword_macro.
+	(enum cpp_warning_reason): Add CPP_W_KEYWORD_MACRO enumerator.
+	(cpp_keyword_p): New inline function.
+	* directives.cc (do_undef): Support -Wkeyword-macro diagnostics.
+	* macro.cc (warn_of_redefinition): Ignore NODE_WARN flag on nodes
+	registered for -Wkeyword-macro.
+	(_cpp_create_definition): Support -Wkeyword-macro diagnostics.
+	Formatting fixes.
+
+2025-08-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/120778
+	* macro.cc (paste_tokens): Use %< and %> instead of \" in
+	diagnostics around %.*s.
+
+2025-08-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/120778
+	* macro.cc (stringify_arg): For C++26 emit a pedarn instead of warning
+	for \ at the end of stringification.
+
+2025-08-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/120845
+	* lex.cc (cpp_maybe_module_directive): Move eol variable declaration
+	to the start of the function, initialize to false and only set it to
+	peek->type == CPP_PRAGMA_EOL in the not_module case.  Formatting fix.
+
 2025-07-30  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/120778

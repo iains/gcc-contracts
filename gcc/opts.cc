@@ -3016,11 +3016,12 @@ common_handle_option (struct gcc_options *opts,
       break;
 
     case OPT_fdiagnostics_column_unit_:
-      dc->m_column_unit = (enum diagnostics_column_unit)value;
+      dc->get_column_options ().m_column_unit
+	= (enum diagnostics_column_unit)value;
       break;
 
     case OPT_fdiagnostics_column_origin_:
-      dc->m_column_origin = value;
+      dc->get_column_options ().m_column_origin = value;
       break;
 
     case OPT_fdiagnostics_escape_format_:
@@ -3049,6 +3050,18 @@ common_handle_option (struct gcc_options *opts,
 
     case OPT_fdiagnostics_show_option:
       dc->set_show_option_requested (value);
+      break;
+
+    case OPT_fdiagnostics_show_nesting:
+      dc->set_show_nesting (value);
+      break;
+
+    case OPT_fdiagnostics_show_nesting_locations:
+      dc->set_show_nesting_locations (value);
+      break;
+
+    case OPT_fdiagnostics_show_nesting_levels:
+      dc->set_show_nesting_levels (value);
       break;
 
     case OPT_fdiagnostics_minimum_margin_width_:
@@ -3408,7 +3421,7 @@ common_handle_option (struct gcc_options *opts,
     case OPT_ftabstop_:
       /* It is documented that we silently ignore silly values.  */
       if (value >= 1 && value <= 100)
-	dc->m_tabstop = value;
+	dc->get_column_options ().m_tabstop = value;
       break;
 
     case OPT_freport_bug:
@@ -3744,7 +3757,7 @@ enable_warning_as_error (const char *arg, int value, unsigned int lang_mask,
    as -Werror.  */
 
 char *
-compiler_diagnostic_option_manager::
+compiler_diagnostic_option_id_manager::
 make_option_name (diagnostics::option_id option_id,
 		  enum diagnostics::kind orig_diag_kind,
 		  enum diagnostics::kind diag_kind) const
@@ -3823,7 +3836,7 @@ get_option_url_suffix (int option_index, unsigned lang_mask)
    which enabled a diagnostic.  */
 
 char *
-gcc_diagnostic_option_manager::
+gcc_diagnostic_option_id_manager::
 make_option_url (diagnostics::option_id option_id) const
 {
   if (option_id.m_idx)
@@ -3879,6 +3892,9 @@ gen_command_line_string (cl_decoded_option *options,
       case OPT_fdiagnostics_show_line_numbers:
       case OPT_fdiagnostics_color_:
       case OPT_fdiagnostics_format_:
+      case OPT_fdiagnostics_show_nesting:
+      case OPT_fdiagnostics_show_nesting_locations:
+      case OPT_fdiagnostics_show_nesting_levels:
       case OPT_fverbose_asm:
       case OPT____:
       case OPT__sysroot_:

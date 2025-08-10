@@ -3962,16 +3962,24 @@ aarch64_sve_emit_masked_fp_pred (machine_mode data_mode, rtx pred)
 
 /* Emit a comparison CMP between OP0 and OP1, both of which have mode
    DATA_MODE, and return the result in a predicate of mode PRED_MODE.
-   Use TARGET as the target register if nonnull and convenient.  */
+   Use TARGET as the target register if nonnull and convenient.
+
+   PRED_MODE can be either VNx16BI or the natural predicate mode for
+   DATA_MODE.  */
 
 static rtx
 aarch64_sve_emit_int_cmp (rtx target, machine_mode pred_mode, rtx_code cmp,
 			  machine_mode data_mode, rtx op1, rtx op2)
 {
-  insn_code icode = code_for_aarch64_pred_cmp (cmp, data_mode);
+  auto src_pred_mode = aarch64_sve_pred_mode (data_mode);
+  insn_code icode;
+  if (known_eq (GET_MODE_NUNITS (pred_mode), GET_MODE_NUNITS (data_mode)))
+    icode = code_for_aarch64_pred_cmp (cmp, data_mode);
+  else
+    icode = code_for_aarch64_pred_cmp_acle (cmp, data_mode);
   expand_operand ops[5];
   create_output_operand (&ops[0], target, pred_mode);
-  create_input_operand (&ops[1], CONSTM1_RTX (pred_mode), pred_mode);
+  create_input_operand (&ops[1], CONSTM1_RTX (src_pred_mode), src_pred_mode);
   create_integer_operand (&ops[2], SVE_KNOWN_PTRUE);
   create_input_operand (&ops[3], op1, data_mode);
   create_input_operand (&ops[4], op2, data_mode);
@@ -3979,15 +3987,14 @@ aarch64_sve_emit_int_cmp (rtx target, machine_mode pred_mode, rtx_code cmp,
   return ops[0].value;
 }
 
-/* Use a comparison to convert integer vector SRC into MODE, which is
-   the corresponding SVE predicate mode.  Use TARGET for the result
-   if it's nonnull and convenient.  */
+/* Use a comparison to convert integer vector SRC into VNx16BI.
+   Use TARGET for the result if it's nonnull and convenient.  */
 
 rtx
-aarch64_convert_sve_data_to_pred (rtx target, machine_mode mode, rtx src)
+aarch64_convert_sve_data_to_pred (rtx target, rtx src)
 {
   machine_mode src_mode = GET_MODE (src);
-  return aarch64_sve_emit_int_cmp (target, mode, NE, src_mode,
+  return aarch64_sve_emit_int_cmp (target, VNx16BImode, NE, src_mode,
 				   src, CONST0_RTX (src_mode));
 }
 
@@ -6069,9 +6076,9 @@ aarch64_sve_move_pred_via_while (rtx target, machine_mode mode,
 				 unsigned int vl)
 {
   rtx limit = force_reg (DImode, gen_int_mode (vl, DImode));
-  target = aarch64_target_reg (target, mode);
-  emit_insn (gen_while (UNSPEC_WHILELO, DImode, mode,
-			target, const0_rtx, limit));
+  target = aarch64_target_reg (target, VNx16BImode);
+  emit_insn (gen_aarch64_sve_while_acle (UNSPEC_WHILELO, DImode, mode,
+					 target, const0_rtx, limit));
   return target;
 }
 
@@ -6217,8 +6224,7 @@ aarch64_expand_sve_const_pred_trn (rtx target, rtx_vector_builder &builder,
      operands but permutes them as though they had mode MODE.  */
   machine_mode mode = aarch64_sve_pred_mode (permute_size).require ();
   target = aarch64_target_reg (target, GET_MODE (a));
-  rtx type_reg = CONST0_RTX (mode);
-  emit_insn (gen_aarch64_sve_trn1_conv (mode, target, a, b, type_reg));
+  emit_insn (gen_aarch64_sve_acle (UNSPEC_TRN1, mode, target, a, b));
   return target;
 }
 
@@ -6300,8 +6306,7 @@ aarch64_expand_sve_const_pred (rtx target, rtx_vector_builder &builder)
   for (unsigned int i = 0; i < builder.encoded_nelts (); ++i)
     int_builder.quick_push (INTVAL (builder.elt (i))
 			    ? constm1_rtx : const0_rtx);
-  return aarch64_convert_sve_data_to_pred (target, VNx16BImode,
-					   int_builder.build ());
+  return aarch64_convert_sve_data_to_pred (target, int_builder.build ());
 }
 
 /* Set DEST to immediate IMM.  */
@@ -6751,6 +6756,27 @@ aarch64_split_sve_subreg_move (rtx dest, rtx ptrue, rtx src)
   src = aarch64_replace_reg_mode (src, mode_with_wider_elts);
   emit_insn (gen_aarch64_pred (unspec, mode_with_wider_elts,
 			       dest, ptrue, src));
+}
+
+/* Set predicate register DEST such that every element has the scalar
+   boolean value in SRC, with any nonzero source counting as "true".
+   MODE is a MODE_VECTOR_BOOL that determines the element size;
+   DEST can have this mode or VNx16BImode.  In the latter case,
+   the upper bits of each element are defined to be zero, as for
+   the .H, .S, and .D forms of PTRUE.  */
+
+void
+aarch64_emit_sve_pred_vec_duplicate (machine_mode mode, rtx dest, rtx src)
+{
+  rtx tmp = gen_reg_rtx (DImode);
+  emit_insn (gen_ashldi3 (tmp, gen_lowpart (DImode, src),
+			  gen_int_mode (63, DImode)));
+  if (GET_MODE (dest) == VNx16BImode)
+    emit_insn (gen_aarch64_sve_while_acle (UNSPEC_WHILELO, DImode, mode,
+					   dest, const0_rtx, tmp));
+  else
+    emit_insn (gen_while (UNSPEC_WHILELO, DImode, mode,
+			  dest, const0_rtx, tmp));
 }
 
 static bool
@@ -25409,20 +25435,41 @@ aarch64_asm_preferred_eh_data_format (int code ATTRIBUTE_UNUSED, int global)
    return (global ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | type;
 }
 
+/* Return true if function declaration FNDECL needs to be marked as
+   having a variant PCS.  */
+
+static bool
+aarch64_is_variant_pcs (tree fndecl)
+{
+  /* Check for ABIs that preserve more registers than usual.  */
+  arm_pcs pcs = (arm_pcs) fndecl_abi (fndecl).id ();
+  if (pcs == ARM_PCS_SIMD || pcs == ARM_PCS_SVE)
+    return true;
+
+  /* Check for ABIs that allow PSTATE.SM to be 1 on entry.  */
+  tree fntype = TREE_TYPE (fndecl);
+  if (aarch64_fntype_pstate_sm (fntype) != AARCH64_ISA_MODE_SM_OFF)
+    return true;
+
+  /* Check for ABIs that require PSTATE.ZA to be 1 on entry, either because
+     of ZA or ZT0.  */
+  if (aarch64_fntype_pstate_za (fntype) != 0)
+    return true;
+
+  return false;
+}
+
 /* Output .variant_pcs for aarch64_vector_pcs function symbols.  */
 
 static void
 aarch64_asm_output_variant_pcs (FILE *stream, const tree decl, const char* name)
 {
-  if (TREE_CODE (decl) == FUNCTION_DECL)
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && aarch64_is_variant_pcs (decl))
     {
-      arm_pcs pcs = (arm_pcs) fndecl_abi (decl).id ();
-      if (pcs == ARM_PCS_SIMD || pcs == ARM_PCS_SVE)
-	{
-	  fprintf (stream, "\t.variant_pcs\t");
-	  assemble_name (stream, name);
-	  fprintf (stream, "\n");
-	}
+      fprintf (stream, "\t.variant_pcs\t");
+      assemble_name (stream, name);
+      fprintf (stream, "\n");
     }
 }
 

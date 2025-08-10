@@ -4936,20 +4936,6 @@ gfc_trans_deferred_vars (gfc_symbol * proc_sym, gfc_wrapped_block * block)
 	    }
 	}
 
-      if (sym->attr.pointer && sym->attr.dimension
-	  && sym->attr.save == SAVE_NONE
-	  && !sym->attr.use_assoc
-	  && !sym->attr.host_assoc
-	  && !sym->attr.dummy
-	  && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (sym->backend_decl)))
-	{
-	  gfc_init_block (&tmpblock);
-	  gfc_conv_descriptor_span_set (&tmpblock, sym->backend_decl,
-				build_int_cst (gfc_array_index_type, 0));
-	  gfc_add_init_cleanup (block, gfc_finish_block (&tmpblock),
-				NULL_TREE);
-	}
-
       if (sym->ts.type == BT_CLASS
 	  && (sym->attr.save || flag_max_stack_var_size == 0)
 	  && CLASS_DATA (sym)->attr.allocatable)
@@ -5148,18 +5134,31 @@ gfc_trans_deferred_vars (gfc_symbol * proc_sym, gfc_wrapped_block * block)
 		      se.descriptor_only = 1;
 		      gfc_conv_expr (&se, e);
 		      descriptor = se.expr;
-		      se.expr = gfc_conv_descriptor_data_addr (se.expr);
-		      se.expr = build_fold_indirect_ref_loc (input_location, se.expr);
+		      se.expr = gfc_conv_descriptor_data_get (se.expr);
 		    }
 		  gfc_free_expr (e);
 
 		  if (!sym->attr.dummy || sym->attr.intent == INTENT_OUT)
 		    {
 		      /* Nullify when entering the scope.  */
-		      tmp = fold_build2_loc (input_location, MODIFY_EXPR,
-					     TREE_TYPE (se.expr), se.expr,
-					     fold_convert (TREE_TYPE (se.expr),
-							   null_pointer_node));
+		      if (sym->ts.type == BT_CLASS
+			  && (CLASS_DATA (sym)->attr.dimension
+			      || CLASS_DATA (sym)->attr.codimension))
+			{
+			  stmtblock_t nullify;
+			  gfc_init_block (&nullify);
+			  gfc_conv_descriptor_data_set (&nullify, descriptor,
+							null_pointer_node);
+			  tmp = gfc_finish_block (&nullify);
+			}
+		      else
+			{
+			  tree typed_null = fold_convert (TREE_TYPE (se.expr),
+							  null_pointer_node);
+			  tmp = fold_build2_loc (input_location, MODIFY_EXPR,
+						 TREE_TYPE (se.expr), se.expr,
+						 typed_null);
+			}
 		      if (sym->attr.optional)
 			{
 			  tree present = gfc_conv_expr_present (sym);

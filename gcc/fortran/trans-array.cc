@@ -284,16 +284,6 @@ gfc_conv_descriptor_data_set (stmtblock_t *block, tree desc, tree value)
 }
 
 
-/* This provides address access to the data field.  This should only be
-   used by array allocation, passing this on to the runtime.  */
-
-tree
-gfc_conv_descriptor_data_addr (tree desc)
-{
-  tree field = gfc_get_descriptor_field (desc, DATA_FIELD);
-  return gfc_build_addr_expr (NULL_TREE, field);
-}
-
 static tree
 gfc_conv_descriptor_offset (tree desc)
 {
@@ -3115,7 +3105,6 @@ trans_array_constructor (gfc_ss * ss, locus * where)
 			     gfc_array_index_type,
 			     offsetvar, gfc_index_one_node);
       tmp = gfc_evaluate_now (tmp, &outer_loop->pre);
-      gfc_conv_descriptor_ubound_set (&loop->pre, desc, gfc_rank_cst[0], tmp);
       if (*loop_ubound0 && VAR_P (*loop_ubound0))
 	gfc_add_modify (&outer_loop->pre, *loop_ubound0, tmp);
       else
@@ -8509,14 +8498,6 @@ gfc_conv_expr_descriptor (gfc_se *se, gfc_expr *expr)
 	  else
 	    gcc_assert (se->ss == ss);
 
-	  if (!is_pointer_array (se->expr))
-	    {
-	      tmp = gfc_get_element_type (TREE_TYPE (se->expr));
-	      tmp = fold_convert (gfc_array_index_type,
-				  size_in_bytes (tmp));
-	      gfc_conv_descriptor_span_set (&se->pre, se->expr, tmp);
-	    }
-
 	  se->expr = gfc_build_addr_expr (NULL_TREE, se->expr);
 	  gfc_conv_expr (se, expr);
 
@@ -9588,9 +9569,8 @@ gfc_conv_array_parameter (gfc_se *se, gfc_expr *expr, bool g77,
 	      new_field = gfc_conv_descriptor_dtype (new_desc);
 	      gfc_add_modify (&se->pre, new_field, old_field);
 
-	      old_field = gfc_conv_descriptor_offset (old_desc);
-	      new_field = gfc_conv_descriptor_offset (new_desc);
-	      gfc_add_modify (&se->pre, new_field, old_field);
+	      old_field = gfc_conv_descriptor_offset_get (old_desc);
+	      gfc_conv_descriptor_offset_set (&se->pre, new_desc, old_field);
 
 	      for (int i = 0; i < expr->rank; i++)
 		{
@@ -11760,8 +11740,8 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
 					  gfc_index_zero_node);
 	}
 
-      tmp = gfc_conv_descriptor_offset (desc);
-      gfc_add_modify (&loop_pre_block, tmp, gfc_index_zero_node);
+      gfc_conv_descriptor_offset_set (&loop_pre_block, desc,
+				      gfc_index_zero_node);
 
       tmp = fold_build2_loc (input_location, EQ_EXPR,
 			     logical_type_node, array1,

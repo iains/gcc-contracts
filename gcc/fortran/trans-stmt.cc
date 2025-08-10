@@ -1876,9 +1876,6 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
   bool class_target;
   bool unlimited;
   tree desc;
-  tree offset;
-  tree dim;
-  int n;
   tree charlen;
   bool need_len_assign;
   bool whole_array = true;
@@ -2116,7 +2113,6 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
       if (sym->assoc->variable || cst_array_ctor)
 	{
 	  se.direct_byref = 1;
-	  se.use_offset = 1;
 	  se.expr = desc;
 	  GFC_DECL_PTR_ARRAY_P (sym->backend_decl) = 1;
 	}
@@ -2181,16 +2177,6 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 	  for (dim = 0; dim < e->rank; ++dim)
 	    gfc_conv_shift_descriptor_lbound (&se.pre, desc,
 					      dim, gfc_index_one_node);
-	}
-
-      /* If this is a subreference array pointer associate name use the
-	 associate variable element size for the value of 'span'.  */
-      if (sym->attr.subref_array_pointer && !se.direct_byref)
-	{
-	  gcc_assert (e->expr_type == EXPR_VARIABLE);
-	  tmp = gfc_get_array_span (se.expr, e);
-
-	  gfc_conv_descriptor_span_set (&se.pre, desc, tmp);
 	}
 
       if (e->expr_type == EXPR_FUNCTION
@@ -2302,21 +2288,6 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 	  se.expr = build_fold_indirect_ref_loc (input_location, se.expr);
 
 	  desc = gfc_class_data_get (se.expr);
-
-	  /* Set the offset.  */
-	  offset = gfc_index_zero_node;
-	  for (n = 0; n < e->rank; n++)
-	    {
-	      dim = gfc_rank_cst[n];
-	      tmp = fold_build2_loc (input_location, MULT_EXPR,
-				     gfc_array_index_type,
-				     gfc_conv_descriptor_stride_get (desc, dim),
-				     gfc_conv_descriptor_lbound_get (desc, dim));
-	      offset = fold_build2_loc (input_location, MINUS_EXPR,
-					gfc_array_index_type,
-					offset, tmp);
-	    }
-	  gfc_conv_descriptor_offset_set (&se.pre, desc, offset);
 
 	  if (need_len_assign)
 	    {
@@ -2494,9 +2465,10 @@ trans_associate_var (gfc_symbol *sym, gfc_wrapped_block *block)
 	{
 	  tmp = sym->backend_decl;
 	  if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (tmp)))
-	    tmp = gfc_conv_descriptor_data_get (tmp);
-	  gfc_add_modify (&se.pre, tmp, fold_convert (TREE_TYPE (tmp),
-						    null_pointer_node));
+	    gfc_conv_descriptor_data_set (&se.pre, tmp, null_pointer_node);
+	  else
+	    gfc_add_modify (&se.pre, tmp,
+			    fold_convert (TREE_TYPE (tmp), null_pointer_node));
 	}
 
       lhs = gfc_lval_expr_from_sym (sym);

@@ -1,3 +1,101 @@
+2025-08-08  David Malcolm  <dmalcolm@redhat.com>
+
+	* error.cc (cp_adjust_diagnostic_info): Convert "context" arg from
+	ptr to const &.
+
+2025-08-07  Patrick Palka  <ppalka@redhat.com>
+
+	* call.cc (extract_call_expr): Remove handling of C++20
+	rewritten comparison operators.
+
+2025-08-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/117783
+	* parser.cc: Implement C++26 P1061R10 - Structured Bindings can
+	introduce a Pack.
+	(cp_parser_range_for): Also handle TREE_VEC as DECL_VALUE_EXPR
+	instead of ARRAY_REF.
+	(cp_parser_decomposition_declaration): Use sb-identifier-list instead
+	of identifier-list in comments.  Parse structured bindings with
+	structured binding pack.  Don't emit pedwarn about structured
+	binding attributes in structured bindings inside of a condition.
+	(cp_convert_omp_range_for): Also handle TREE_VEC as DECL_VALUE_EXPR
+	instead of ARRAY_REF.
+	* decl.cc (get_tuple_element_type): Change i argument type from
+	unsigned to unsigned HOST_WIDE_INT.
+	(get_tuple_decomp_init): Likewise.
+	(set_sb_pack_name): New function.
+	(cp_finish_decomp): Handle structured binding packs.
+	* pt.cc (tsubst_pack_expansion): Handle structured binding packs
+	and capture proxies for them.  Formatting fixes.
+	(tsubst_decl): For structured binding packs don't tsubst TREE_TYPE
+	first, instead recreate the type after r is created.
+	(tsubst_omp_for_iterator): Also handle TREE_VEC as DECL_VALUE_EXPR
+	instead of ARRAY_REF.
+	(tsubst_expr): Handle sizeof... on non-dependent structure binding
+	packs.
+	(value_dependent_expression_p): Return false for sizeof... on
+	non-dependent structure binding packs.
+	(instantiation_dependent_r): Don't recurse on sizeof... on
+	non-dependent structure binding packs.
+	* constexpr.cc (potential_constant_expression_1): Also handle
+	TREE_VEC on DECL_VALUE_EXPR of structure binding packs.
+
+2025-08-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/120778
+	* lex.cc (cxx_init): Mark cpp nodes corresponding
+	to keywords, identifiers with special meaning and standard
+	attribute identifiers as NODE_WARN if warn_keyword_macro.
+
+2025-08-06  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/121231
+	PR c++/119688
+	PR c++/94511
+	* mangle.cc (write_expression): Write out implicit non-trailing
+	zeroes of a CONSTRUCTOR when the ABI version is at least 21.
+
+2025-08-06  Jason Merrill  <jason@redhat.com>
+
+	* constexpr.cc (cxx_eval_indirect_ref): Improve diagnostic.
+
+2025-08-06  Kwok Cheung Yeung  <kcyeung@baylibre.com>
+
+	* parser.cc (cp_parser_omp_clause_from_to): Parse 'iterator' modifier.
+	* semantics.cc (finish_omp_clauses): Finish iterators for to/from
+	clauses.
+
+2025-08-06  Kwok Cheung Yeung  <kcyeung@baylibre.com>
+	    Andrew Stubbs  <ams@baylibre.com>
+
+	* parser.cc (cp_parser_omp_clause_map): Parse 'iterator' modifier.
+	* semantics.cc (finish_omp_clauses): Finish iterators.  Apply
+	iterators to generated clauses.
+
+2025-08-05  Jason Merrill  <jason@redhat.com>
+
+	PR c++/121068
+	* constexpr.cc (cxx_eval_store_expression): Handle clobbers.
+	(potential_constant_expression_1): Handle clobbers more.
+	* decl.cc (build_clobber_this): Use INIT_EXPR for initial clobber.
+	* init.cc (build_new_1): Clobber on placement new.
+	(build_vec_init): Don't clean up after clobber.
+
+2025-08-04  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/121351
+	PR c++/119859
+	* class.cc (add_method): Substitute outer template arguments
+	into constraints before comparing them if the declarations are
+	from different classes.
+
+2025-08-04  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/120620
+	* constexpr.cc (cxx_dynamic_cast_fn_p): Return true only
+	for synthesized __dynamic_cast.
+
 2025-08-01  Nathaniel Shead  <nathanieloshead@gmail.com>
 
 	PR c++/108080
