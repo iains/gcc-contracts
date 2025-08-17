@@ -143,6 +143,7 @@ extern void riscv_expand_sstrunc (rtx, rtx);
 extern int riscv_register_move_cost (machine_mode, reg_class_t, reg_class_t);
 extern bool synthesize_ior_xor (rtx_code, rtx [3]);
 extern bool synthesize_and (rtx [3]);
+extern bool synthesize_add (rtx [3]);
 
 #ifdef RTX_CODE
 extern void riscv_expand_int_scc (rtx, enum rtx_code, rtx, rtx, bool *invert_ptr = 0);
@@ -836,10 +837,12 @@ riscv_option_valid_attribute_p (tree, tree, tree, int);
 extern bool
 riscv_option_valid_version_attribute_p (tree, tree, tree, int);
 extern bool
-riscv_process_target_version_attr (tree, location_t);
+riscv_process_target_version_attr (tree, location_t *);
 extern void
 riscv_override_options_internal (struct gcc_options *);
 extern void riscv_option_override (void);
+extern rtx riscv_prefetch_cookie (rtx, rtx);
+extern bool riscv_prefetch_offset_address_p (rtx, machine_mode);
 
 struct riscv_tune_param;
 /* Information about one micro-arch we know about.  */

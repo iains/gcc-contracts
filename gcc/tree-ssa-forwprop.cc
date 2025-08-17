@@ -1299,7 +1299,7 @@ optimize_aggr_zeroprop_1 (gimple *defstmt, gimple *stmt,
    and/or memcpy (&b, &a, sizeof (a)); instead of b = a;  */
 
 static bool
-optimize_aggr_zeroprop (gimple_stmt_iterator *gsip)
+optimize_aggr_zeroprop (gimple_stmt_iterator *gsip, bool full_walk)
 {
   ao_ref read;
   gimple *stmt = gsi_stmt (*gsip);
@@ -1340,6 +1340,21 @@ optimize_aggr_zeroprop (gimple_stmt_iterator *gsip)
 	    }
 	}
     }
+  /* A store of integer (scalar, vector or complex) zeros is
+     a zero store. */
+  else if (gimple_store_p (stmt)
+	   && gimple_assign_single_p (stmt)
+	   && integer_zerop (gimple_assign_rhs1 (stmt)))
+    {
+      tree rhs = gimple_assign_rhs1 (stmt);
+      tree type = TREE_TYPE (rhs);
+      dest = gimple_assign_lhs (stmt);
+      ao_ref_init (&read, dest);
+      /* For integral types, the type precision needs to be a multiply of BITS_PER_UNIT. */
+      if (INTEGRAL_TYPE_P (type)
+	  && (TYPE_PRECISION (type) % BITS_PER_UNIT) != 0)
+	dest = NULL_TREE;
+    }
   else if (gimple_store_p (stmt)
 	   && gimple_assign_single_p (stmt)
 	   && TREE_CODE (gimple_assign_rhs1 (stmt)) == CONSTRUCTOR
@@ -1368,7 +1383,7 @@ optimize_aggr_zeroprop (gimple_stmt_iterator *gsip)
 
   /* Setup the worklist.  */
   auto_vec<std::pair<tree, unsigned>> worklist;
-  unsigned limit = param_sccvn_max_alias_queries_per_access;
+  unsigned limit = full_walk ? param_sccvn_max_alias_queries_per_access : 0;
   worklist.safe_push (std::make_pair (gimple_vdef (stmt), limit));
 
   while (!worklist.is_empty ())
@@ -1385,13 +1400,17 @@ optimize_aggr_zeroprop (gimple_stmt_iterator *gsip)
 	    continue;
 
 	  /* If this statement does not clobber add the vdef stmt to the
-	     worklist.  */
-	  if (gimple_vdef (use_stmt)
+	     worklist.
+	     After hitting the limit, allow clobbers to able to pass through.  */
+	  if ((limit != 0 || gimple_clobber_p (use_stmt))
+	      && gimple_vdef (use_stmt)
 	      && !stmt_may_clobber_ref_p_1 (use_stmt, &read,
-					   /* tbaa_p = */ can_use_tbba)
-	      && limit != 0)
-	    worklist.safe_push (std::make_pair (gimple_vdef (use_stmt),
-						limit - 1));
+					   /* tbaa_p = */ can_use_tbba))
+	      {
+		unsigned new_limit = limit == 0 ? 0 : limit - 1;
+		worklist.safe_push (std::make_pair (gimple_vdef (use_stmt),
+						    new_limit));
+	      }
 
 	  if (optimize_aggr_zeroprop_1 (stmt, use_stmt, dest_base, offset,
 					 val, wi::to_poly_offset (len)))
@@ -1401,6 +1420,106 @@ optimize_aggr_zeroprop (gimple_stmt_iterator *gsip)
 
   return changed;
 }
+
+/* Helper function for optimize_agr_copyprop.
+   For aggregate copies in USE_STMT, see if DEST
+   is on the lhs of USE_STMT and replace it with SRC. */
+static bool
+optimize_agr_copyprop_1 (gimple *stmt, gimple *use_stmt,
+			 tree dest, tree src)
+{
+  gcc_assert (gimple_assign_load_p (use_stmt)
+	      && gimple_store_p (use_stmt));
+  if (gimple_has_volatile_ops (use_stmt))
+    return false;
+  tree dest2 = gimple_assign_lhs (use_stmt);
+  tree src2 = gimple_assign_rhs1 (use_stmt);
+  /* If the new store is `src2 = src2;` skip over it. */
+  if (operand_equal_p (src2, dest2, 0))
+    return false;
+  if (!operand_equal_p (dest, src2, 0))
+    return false;
+  /* For 2 memory refences and using a temporary to do the copy,
+     don't remove the temporary as the 2 memory references might overlap.
+     Note t does not need to be decl as it could be field.
+     See PR 22237 for full details.
+     E.g.
+     t = *a; #DEST = SRC;
+     *b = t; #DEST2 = SRC2;
+     Cannot be convert into
+     t = *a;
+     *b = *a;
+     Though the following is allowed to be done:
+     t = *a;
+     *a = t;
+     And convert it into:
+     t = *a;
+     *a = *a;
+     */
+  if (!operand_equal_p (dest2, src, 0)
+      && !DECL_P (dest2) && !DECL_P (src))
+    return false;
+
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "Simplified\n  ");
+      print_gimple_stmt (dump_file, use_stmt, 0, dump_flags);
+      fprintf (dump_file, "after previous\n  ");
+      print_gimple_stmt (dump_file, stmt, 0, dump_flags);
+    }
+  gimple *orig_stmt = use_stmt;
+  gimple_stmt_iterator gsi = gsi_for_stmt (use_stmt);
+  gimple_assign_set_rhs_from_tree (&gsi, unshare_expr (src));
+  update_stmt (use_stmt);
+
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "into\n  ");
+      print_gimple_stmt (dump_file, use_stmt, 0, dump_flags);
+    }
+  if (maybe_clean_or_replace_eh_stmt (orig_stmt, use_stmt))
+    bitmap_set_bit (to_purge, gimple_bb (stmt)->index);
+  statistics_counter_event (cfun, "copy prop for aggregate", 1);
+  return true;
+}
+
+/* Helper function for optimize_agr_copyprop_1, propagate aggregates
+   into the arguments of USE_STMT if the argument matches with DEST;
+   replacing it with SRC.  */
+static bool
+optimize_agr_copyprop_arg (gimple *defstmt, gcall *call,
+			   tree dest, tree src)
+{
+  bool changed = false;
+  for (unsigned arg = 0; arg < gimple_call_num_args (call); arg++)
+    {
+      tree *argptr = gimple_call_arg_ptr (call, arg);
+      if (TREE_CODE (*argptr) == SSA_NAME
+	  || is_gimple_min_invariant (*argptr)
+	  || TYPE_VOLATILE (TREE_TYPE (*argptr)))
+	continue;
+      if (!operand_equal_p (*argptr, dest, 0))
+	continue;
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	{
+	  fprintf (dump_file, "Simplified\n  ");
+	  print_gimple_stmt (dump_file, call, 0, dump_flags);
+	  fprintf (dump_file, "after previous\n  ");
+	  print_gimple_stmt (dump_file, defstmt, 0, dump_flags);
+	}
+      *argptr = unshare_expr (src);
+      changed = true;
+      if (dump_file && (dump_flags & TDF_DETAILS))
+	{
+	  fprintf (dump_file, "into\n  ");
+	  print_gimple_stmt (dump_file, call, 0, dump_flags);
+	}
+    }
+  if (changed)
+    update_stmt (call);
+  return changed;
+}
+
 /* Optimizes
    DEST = SRC;
    DEST2 = DEST; # DEST2 = SRC2;
@@ -1409,6 +1528,14 @@ optimize_aggr_zeroprop (gimple_stmt_iterator *gsip)
    DEST2 = SRC;
    GSIP is the first statement and SRC is the common
    between the statements.
+
+   Also optimizes:
+   DEST = SRC;
+   call_func(..., DEST, ...);
+   into:
+   DEST = SRC;
+   call_func(..., SRC, ...);
+
 */
 static bool
 optimize_agr_copyprop (gimple_stmt_iterator *gsip)
@@ -1433,56 +1560,14 @@ optimize_agr_copyprop (gimple_stmt_iterator *gsip)
   bool changed = false;
   FOR_EACH_IMM_USE_STMT (use_stmt, iter, vdef)
     {
-      if (!gimple_assign_load_p (use_stmt)
-	  || !gimple_store_p (use_stmt))
-	continue;
-      if (gimple_has_volatile_ops (use_stmt))
-	continue;
-      tree dest2 = gimple_assign_lhs (use_stmt);
-      tree src2 = gimple_assign_rhs1 (use_stmt);
-      /* If the new store is `src2 = src2;` skip over it. */
-      if (operand_equal_p (src2, dest2, 0))
-	continue;
-      if (!operand_equal_p (dest, src2, 0))
-	continue;
-      /* For 2 memory refences and using a temporary to do the copy,
-	 don't remove the temporary as the 2 memory references might overlap.
-	 Note t does not need to be decl as it could be field.
-	 See PR 22237 for full details.
-	 E.g.
-	 t = *a; #DEST = SRC;
-	 *b = t; #DEST2 = SRC2;
-	 Cannot be convert into
-	 t = *a;
-	 *b = *a;
-	 Though the following is allowed to be done:
-	 t = *a;
-	 *a = t;
-	 And convert it into:
-	 t = *a;
-	 *a = *a;
-       */
-      if (!operand_equal_p (dest2, src, 0)
-	  && !DECL_P (dest2) && !DECL_P (src))
-	continue;
-      if (dump_file && (dump_flags & TDF_DETAILS))
-	{
-	  fprintf (dump_file, "Simplified\n  ");
-	  print_gimple_stmt (dump_file, use_stmt, 0, dump_flags);
-	  fprintf (dump_file, "after previous\n  ");
-	  print_gimple_stmt (dump_file, stmt, 0, dump_flags);
-	}
-      gimple_stmt_iterator gsi = gsi_for_stmt (use_stmt);
-      gimple_assign_set_rhs_from_tree (&gsi, unshare_expr (src));
-      update_stmt (use_stmt);
-
-      if (dump_file && (dump_flags & TDF_DETAILS))
-	{
-	  fprintf (dump_file, "into\n  ");
-	  print_gimple_stmt (dump_file, use_stmt, 0, dump_flags);
-	}
-      statistics_counter_event (cfun, "copy prop for aggregate", 1);
-      changed = true;
+      if (gimple_assign_load_p (use_stmt)
+	  && gimple_store_p (use_stmt)
+	  && optimize_agr_copyprop_1 (stmt, use_stmt, dest, src))
+	changed = true;
+      else if (is_gimple_call (use_stmt)
+	       && optimize_agr_copyprop_arg (stmt, as_a<gcall*>(use_stmt),
+					     dest, src))
+	changed = true;
     }
   return changed;
 }
@@ -1510,7 +1595,7 @@ optimize_agr_copyprop (gimple_stmt_iterator *gsip)
    to __atomic_fetch_op (p, x, y) when possible (also __sync).  */
 
 static bool
-simplify_builtin_call (gimple_stmt_iterator *gsi_p, tree callee2)
+simplify_builtin_call (gimple_stmt_iterator *gsi_p, tree callee2, bool full_walk)
 {
   gimple *stmt1, *stmt2 = gsi_stmt (*gsi_p);
   enum built_in_function other_atomic = END_BUILTINS;
@@ -1589,7 +1674,7 @@ simplify_builtin_call (gimple_stmt_iterator *gsi_p, tree callee2)
 	{
 	  /* Try to prop the zeroing/value of the memset to memcpy
 	     if the dest is an address and the value is a constant. */
-	  if (optimize_aggr_zeroprop (gsi_p))
+	  if (optimize_aggr_zeroprop (gsi_p, full_walk))
 	    return true;
 	}
       if (gimple_call_num_args (stmt2) != 3
@@ -4379,8 +4464,17 @@ public:
   opt_pass * clone () final override { return new pass_forwprop (m_ctxt); }
   void set_pass_param (unsigned int n, bool param) final override
     {
-      gcc_assert (n == 0);
-      last_p = param;
+      switch (n)
+	{
+	  case 0:
+	    m_full_walk = param;
+	    break;
+	  case 1:
+	    last_p = param;
+	    break;
+	  default:
+	  gcc_unreachable();
+	}
     }
   bool gate (function *) final override { return flag_tree_forwprop; }
   unsigned int execute (function *) final override;
@@ -4388,12 +4482,17 @@ public:
  private:
   /* Determines whether the pass instance should set PROP_last_full_fold.  */
   bool last_p;
+
+  /* True if the aggregate props are doing a full walk or not.  */
+  bool m_full_walk = false;
 }; // class pass_forwprop
 
 unsigned int
 pass_forwprop::execute (function *fun)
 {
   unsigned int todoflags = 0;
+  /* Handle a full walk only when expensive optimizations are on.  */
+  bool full_walk = m_full_walk && flag_expensive_optimizations;
 
   cfg_changed = false;
   if (last_p)
@@ -4910,7 +5009,7 @@ pass_forwprop::execute (function *fun)
 		  {
 		    tree rhs1 = gimple_assign_rhs1 (stmt);
 		    enum tree_code code = gimple_assign_rhs_code (stmt);
-		    if (gimple_store_p (stmt) && optimize_aggr_zeroprop (&gsi))
+		    if (gimple_store_p (stmt) && optimize_aggr_zeroprop (&gsi, full_walk))
 		      {
 			changed = true;
 			break;
@@ -4970,7 +5069,7 @@ pass_forwprop::execute (function *fun)
 		    tree callee = gimple_call_fndecl (stmt);
 		    if (callee != NULL_TREE
 			&& fndecl_built_in_p (callee, BUILT_IN_NORMAL))
-		      changed |= simplify_builtin_call (&gsi, callee);
+		      changed |= simplify_builtin_call (&gsi, callee, full_walk);
 		    break;
 		  }
 

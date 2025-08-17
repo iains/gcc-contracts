@@ -2196,13 +2196,13 @@ vect_determine_partial_vectors_and_peeling (loop_vec_info loop_vinfo)
    indicates if some analysis meets fatal error.  If one non-NULL pointer
    SUGGESTED_UNROLL_FACTOR is provided, it's intent to be filled with one
    worked out suggested unroll factor, while one NULL pointer shows it's
-   going to apply the suggested unroll factor.  SLP_DONE_FOR_SUGGESTED_UF
-   is to hold the slp decision when the suggested unroll factor is worked
-   out.  */
+   going to apply the suggested unroll factor.
+   SINGLE_LANE_SLP_DONE_FOR_SUGGESTED_UF is to hold whether single-lane
+   slp was forced when the suggested unroll factor was worked out.  */
 static opt_result
 vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
 		     unsigned *suggested_unroll_factor,
-		     unsigned& slp_done_for_suggested_uf)
+		     bool& single_lane_slp_done_for_suggested_uf)
 {
   opt_result ok = opt_result::success ();
   int res;
@@ -2266,14 +2266,14 @@ vect_analyze_loop_2 (loop_vec_info loop_vinfo, bool &fatal,
   bool applying_suggested_uf = loop_vinfo->suggested_unroll_factor > 1;
   gcc_assert (!applying_suggested_uf || !suggested_unroll_factor);
 
-  /* If the slp decision is false when suggested unroll factor is worked
-     out, and we are applying suggested unroll factor, we can simply skip
-     all slp related analyses this time.  */
-  unsigned slp = !applying_suggested_uf ? 2 : slp_done_for_suggested_uf;
+  /* When single-lane SLP was forced and we are applying suggested unroll
+     factor, keep that decision here.  */
+  bool force_single_lane = (applying_suggested_uf
+			    && single_lane_slp_done_for_suggested_uf);
 
   /* Classify all cross-iteration scalar data-flow cycles.
      Cross-iteration cycles caused by virtual phis are analyzed separately.  */
-  vect_analyze_scalar_cycles (loop_vinfo, slp == 2);
+  vect_analyze_scalar_cycles (loop_vinfo, !force_single_lane);
 
   vect_pattern_recog (loop_vinfo);
 
@@ -2333,7 +2333,7 @@ start_over:
   /* Check the SLP opportunities in the loop, analyze and build
      SLP trees.  */
   ok = vect_analyze_slp (loop_vinfo, loop_vinfo->stmt_vec_infos.length (),
-			 slp == 1);
+			 force_single_lane);
   if (!ok)
     return ok;
 
@@ -2668,7 +2668,7 @@ start_over:
   gcc_assert (known_eq (vectorization_factor,
 			LOOP_VINFO_VECT_FACTOR (loop_vinfo)));
 
-  slp_done_for_suggested_uf = slp;
+  single_lane_slp_done_for_suggested_uf = force_single_lane;
 
   /* Ok to vectorize!  */
   LOOP_VINFO_VECTORIZABLE_P (loop_vinfo) = 1;
@@ -2679,7 +2679,7 @@ again:
   gcc_assert (!ok);
 
   /* Try again with single-lane SLP.  */
-  if (slp == 1)
+  if (force_single_lane)
     return ok;
 
   /* If we are applying suggested unroll factor, we don't need to
@@ -2732,7 +2732,7 @@ again:
     }
 
   /* Roll back state appropriately.  Force single-lane SLP this time.  */
-  slp = 1;
+  force_single_lane = true;
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location,
 		     "re-trying with single-lane SLP\n");
@@ -2889,12 +2889,12 @@ vect_analyze_loop_1 (class loop *loop, vec_info_shared *shared,
   if (masked_p != -1)
     loop_vinfo->can_use_partial_vectors_p = masked_p;
   unsigned int suggested_unroll_factor = 1;
-  unsigned slp_done_for_suggested_uf = 0;
+  bool single_lane_slp_done_for_suggested_uf = false;
 
   /* Run the main analysis.  */
   opt_result res = vect_analyze_loop_2 (loop_vinfo, fatal,
 					&suggested_unroll_factor,
-					slp_done_for_suggested_uf);
+					single_lane_slp_done_for_suggested_uf);
   if (dump_enabled_p ())
     dump_printf_loc (MSG_NOTE, vect_location,
 		     "***** Analysis %s with vector mode %s\n",
@@ -2926,16 +2926,17 @@ vect_analyze_loop_1 (class loop *loop, vec_info_shared *shared,
 	    if (dump_enabled_p ())
 	      dump_printf_loc (MSG_NOTE, vect_location,
 			 "***** Re-trying analysis for unrolling"
-			 " with unroll factor %d and slp %s.\n",
+			 " with unroll factor %d and %s slp.\n",
 			 suggested_unroll_factor,
-			 slp_done_for_suggested_uf ? "on" : "off");
+			 single_lane_slp_done_for_suggested_uf
+			 ? "single-lane" : "");
 	    loop_vec_info unroll_vinfo
 		= vect_create_loop_vinfo (loop, shared, loop_form_info, NULL);
 	    unroll_vinfo->vector_mode = vector_mode;
 	    unroll_vinfo->suggested_unroll_factor = suggested_unroll_factor;
 	    opt_result new_res
 		= vect_analyze_loop_2 (unroll_vinfo, fatal, NULL,
-				       slp_done_for_suggested_uf);
+				       single_lane_slp_done_for_suggested_uf);
 	    if (new_res)
 	      {
 		delete loop_vinfo;
@@ -5012,6 +5013,7 @@ vect_emit_reduction_init_stmts (loop_vec_info loop_vinfo,
 static void
 get_initial_defs_for_reduction (loop_vec_info loop_vinfo,
 				stmt_vec_info reduc_info,
+				tree vector_type,
 				vec<tree> *vec_oprnds,
 				unsigned int number_of_vectors,
 				unsigned int group_size, tree neutral_op)
@@ -5019,7 +5021,6 @@ get_initial_defs_for_reduction (loop_vec_info loop_vinfo,
   vec<tree> &initial_values = reduc_info->reduc_initial_values;
   unsigned HOST_WIDE_INT nunits;
   unsigned j, number_of_places_left_in_vector;
-  tree vector_type = STMT_VINFO_VECTYPE (reduc_info);
   unsigned int i;
 
   gcc_assert (group_size == initial_values.length () || neutral_op);
@@ -5155,7 +5156,7 @@ info_for_reduction (vec_info *vinfo, stmt_vec_info stmt_info)
 
 static bool
 vect_find_reusable_accumulator (loop_vec_info loop_vinfo,
-				stmt_vec_info reduc_info)
+				stmt_vec_info reduc_info, tree vectype)
 {
   loop_vec_info main_loop_vinfo = LOOP_VINFO_ORIG_LOOP_INFO (loop_vinfo);
   if (!main_loop_vinfo)
@@ -5204,7 +5205,6 @@ vect_find_reusable_accumulator (loop_vec_info loop_vinfo,
     return false;
 
   /* Handle the case where we can reduce wider vectors to narrower ones.  */
-  tree vectype = STMT_VINFO_VECTYPE (reduc_info);
   tree old_vectype = TREE_TYPE (accumulator->reduc_input);
   unsigned HOST_WIDE_INT m;
   if (!constant_multiple_p (TYPE_VECTOR_SUBPARTS (old_vectype),
@@ -7225,7 +7225,7 @@ vectorizable_reduction (loop_vec_info loop_vinfo,
 		vectype_in = vectype_op;
 	    }
 	  else if (!vectype_in)
-	    vectype_in = STMT_VINFO_VECTYPE (phi_info);
+	    vectype_in = SLP_TREE_VECTYPE (slp_node);
 	  if (!REDUC_GROUP_FIRST_ELEMENT (vdef))
 	    vdef_slp = SLP_TREE_CHILDREN (vdef_slp)[reduc_idx];
 	}
@@ -8435,7 +8435,7 @@ vect_transform_cycle_phi (loop_vec_info loop_vinfo,
 	  initial_values.quick_push (vect_phi_initial_value (this_phi));
 	}
       if (vec_num == 1)
-	vect_find_reusable_accumulator (loop_vinfo, reduc_info);
+	vect_find_reusable_accumulator (loop_vinfo, reduc_info, vectype_out);
       if (!initial_values.is_empty ())
 	{
 	  tree initial_value
@@ -8458,7 +8458,7 @@ vect_transform_cycle_phi (loop_vec_info loop_vinfo,
 		= initial_values[0];
 	      initial_values[0] = neutral_op;
 	    }
-	  get_initial_defs_for_reduction (loop_vinfo, reduc_info,
+	  get_initial_defs_for_reduction (loop_vinfo, reduc_info, vectype_out,
 					  &vec_initial_defs, vec_num,
 					  stmts.length (), neutral_op);
 	}

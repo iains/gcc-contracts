@@ -1,3 +1,40 @@
+2025-08-16  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR fortran/107421
+	* trans-common.cc (build_common_decl): Call set_decl_tls_model
+	after processing a variable.
+	* trans-decl.cc (gfc_finish_var_decl): Likewise.
+	(get_proc_pointer_decl): Likewise.
+
+2025-08-13  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/89092
+	* resolve.cc (was_declared): Add subroutine attribute.
+
+2025-08-12  Yuao Ma  <c8ef@outlook.com>
+
+	* check.cc (gfc_check_c_f_pointer): Check lower arg legitimacy.
+	* intrinsic.cc (add_subroutines): Teach c_f_pointer about lower arg.
+	* intrinsic.h (gfc_check_c_f_pointer): Add lower arg.
+	* intrinsic.texi: Update lower arg for c_f_pointer.
+	* trans-intrinsic.cc (conv_isocbinding_subroutine): Add logic handle lower.
+
+2025-08-11  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/121398
+	* resolve.cc (check_pdt_args): New function.
+	(check_generic_tbp_ambiguity): Use it to ensure that args to
+	typebound procedures that do not have the same declared type as
+	the containing derived type have 'pass1/2' set to null. This
+	avoids false ambiguity errors.
+	(resolve_typebound_procedure): Do not generate a wrong type
+	error for typebound procedures marked as pass if they are of a
+	different declared type to the containing pdt_type.
+
+2025-08-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* gfortran.h (gfc_case): Fix comment typo, singe -> single.
+
 2025-08-09  Paul Thomas  <pault@gcc.gnu.org>
 
 	PR fortran/121182

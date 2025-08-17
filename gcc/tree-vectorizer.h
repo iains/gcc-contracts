@@ -204,8 +204,20 @@ enum vect_memory_access_type {
   VMAT_STRIDED_SLP,
 
   /* The access uses gather loads or scatter stores.  */
-  VMAT_GATHER_SCATTER
+  VMAT_GATHER_SCATTER_LEGACY,
+  VMAT_GATHER_SCATTER_IFN,
+  VMAT_GATHER_SCATTER_EMULATED
 };
+
+/* Returns whether MAT is any of the VMAT_GATHER_SCATTER_* kinds.  */
+
+inline bool
+mat_gather_scatter_p (vect_memory_access_type mat)
+{
+  return (mat == VMAT_GATHER_SCATTER_LEGACY
+	  || mat == VMAT_GATHER_SCATTER_IFN
+	  || mat == VMAT_GATHER_SCATTER_EMULATED);
+}
 
 /*-----------------------------------------------------------------*/
 /* Info on vectorized defs.                                        */
@@ -419,6 +431,7 @@ public:
 #define SLP_TREE_TYPE(S)			 (S)->type
 #define SLP_TREE_GS_SCALE(S)			 (S)->gs_scale
 #define SLP_TREE_GS_BASE(S)			 (S)->gs_base
+#define SLP_TREE_PERMUTE_P(S)			 ((S)->code == VEC_PERM_EXPR)
 
 enum vect_partial_vector_style {
     vect_partial_vectors_none,
@@ -1663,13 +1676,6 @@ struct gather_scatter_info {
 #define PURE_SLP_STMT(S)                  ((S)->slp_type == pure_slp)
 #define STMT_SLP_TYPE(S)                   (S)->slp_type
 
-#define GATHER_SCATTER_LEGACY_P(info) ((info).decl != NULL_TREE \
-				       && (info).ifn == IFN_LAST)
-#define GATHER_SCATTER_IFN_P(info) ((info).decl == NULL_TREE \
-				    && (info).ifn != IFN_LAST)
-#define GATHER_SCATTER_EMULATED_P(info) ((info).decl == NULL_TREE \
-					 && (info).ifn == IFN_LAST)
-
 
 /* Contains the scalar or vector costs for a vec_info.  */
 class vector_costs
@@ -2549,7 +2555,7 @@ extern bool ref_within_array_bound (gimple *, tree);
 extern bool vect_can_force_dr_alignment_p (const_tree, poly_uint64);
 extern enum dr_alignment_support vect_supportable_dr_alignment
 				   (vec_info *, dr_vec_info *, tree, int,
-				     gather_scatter_info * = nullptr);
+				    bool = false);
 extern tree vect_get_smallest_scalar_type (stmt_vec_info, tree);
 extern opt_result vect_analyze_data_ref_dependences (loop_vec_info, unsigned int *);
 extern bool vect_slp_analyze_instance_dependence (vec_info *, slp_instance);

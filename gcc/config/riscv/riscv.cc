@@ -3685,7 +3685,8 @@ riscv_legitimize_move (machine_mode mode, rtx dest, rtx src)
       /* This test can fail if (for example) we want a HF and Z[v]fh is
 	 not enabled.  In that case we just want to let the standard
 	 expansion path run.  */
-      if (riscv_vector::get_vector_mode (smode, nunits).exists (&vmode))
+      if (riscv_vector::get_vector_mode (smode, nunits).exists (&vmode)
+	  && gen_lowpart_common (vmode, SUBREG_REG (src)))
 	{
 	  rtx v = gen_lowpart (vmode, SUBREG_REG (src));
 	  rtx int_reg = dest;
@@ -3958,41 +3959,6 @@ riscv_extend_cost (rtx op, bool unsigned_p)
   return COSTS_N_INSNS (2);
 }
 
-/* Return the cost of the vector binary rtx like add, minus, mult.
-   The cost of scalar2vr_cost will be appended if there one of the
-   op comes from the VEC_DUPLICATE.  */
-
-static int
-get_vector_binary_rtx_cost (rtx x, int scalar2vr_cost)
-{
-  gcc_assert (riscv_v_ext_mode_p (GET_MODE (x)));
-
-  rtx neg;
-  rtx op_0;
-  rtx op_1;
-
-  if (GET_CODE (x) == UNSPEC)
-    {
-      op_0 = XVECEXP (x, 0, 0);
-      op_1 = XVECEXP (x, 0, 1);
-    }
-  else
-    {
-      op_0 = XEXP (x, 0);
-      op_1 = XEXP (x, 1);
-    }
-
-  if (GET_CODE (op_0) == VEC_DUPLICATE
-      || GET_CODE (op_1) == VEC_DUPLICATE)
-    return (scalar2vr_cost + 1) * COSTS_N_INSNS (1);
-  else if (GET_CODE (neg = op_0) == NEG
-	   && (GET_CODE (op_1) == VEC_DUPLICATE
-	       || GET_CODE (XEXP (neg, 0)) == VEC_DUPLICATE))
-    return (scalar2vr_cost + 1) * COSTS_N_INSNS (1);
-  else
-    return COSTS_N_INSNS (1);
-}
-
 /* Implement TARGET_RTX_COSTS.  */
 
 #define SINGLE_SHIFT_COST 1
@@ -4014,73 +3980,20 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
 	{
 	case SET:
 	  {
-	    switch (GET_CODE (x))
+	    if (GET_CODE (x) == VEC_DUPLICATE)
+	      *total = (scalar2vr_cost + 1) * COSTS_N_INSNS (1);
+	    else
 	      {
-	      case VEC_DUPLICATE:
-		*total = gr2vr_cost * COSTS_N_INSNS (1);
-		break;
-	      case IF_THEN_ELSE:
-		{
-		  rtx op = XEXP (x, 1);
+		int vec_dup_count = 0;
+		subrtx_var_iterator::array_type array;
 
-		  switch (GET_CODE (op))
-		    {
-		    case DIV:
-		    case UDIV:
-		    case MOD:
-		    case UMOD:
-		    case US_PLUS:
-		    case US_MINUS:
-		    case SS_PLUS:
-		    case SS_MINUS:
-		      *total = get_vector_binary_rtx_cost (op, scalar2vr_cost);
-		      break;
-		    case UNSPEC:
-		      {
-			switch (XINT (op, 1))
-			  {
-			  case UNSPEC_VAADDU:
-			  case UNSPEC_VAADD:
-			    *total
-			      = get_vector_binary_rtx_cost (op, scalar2vr_cost);
-			    break;
-			  default:
-			    *total = COSTS_N_INSNS (1);
-			    break;
-			  }
-		      }
-		      break;
-		    default:
-		      *total = COSTS_N_INSNS (1);
-		      break;
-		    }
-		}
-		break;
-	      case PLUS:
-	      case MINUS:
-	      case AND:
-	      case IOR:
-	      case XOR:
-	      case MULT:
-	      case SMAX:
-	      case UMAX:
-	      case SMIN:
-	      case UMIN:
-		{
-		  rtx op;
-		  rtx op_0 = XEXP (x, 0);
-		  rtx op_1 = XEXP (x, 1);
+		FOR_EACH_SUBRTX_VAR (iter, array, x, ALL)
+		  if (GET_CODE (*iter) == VEC_DUPLICATE)
+		    vec_dup_count++;
 
-		  if (GET_CODE (op = op_0) == MULT
-		      || GET_CODE (op = op_1) == MULT)
-		    *total = get_vector_binary_rtx_cost (op, scalar2vr_cost);
-		  else
-		    *total = get_vector_binary_rtx_cost (x, scalar2vr_cost);
-		}
-		break;
-	      default:
-		*total = COSTS_N_INSNS (1);
-		break;
+		int total_vec_dup_cost = vec_dup_count * scalar2vr_cost;
+
+		*total = COSTS_N_INSNS (1) * (total_vec_dup_cost + 1);
 	      }
 	  }
 	  break;
@@ -5532,9 +5445,9 @@ canonicalize_comparands (rtx_code code, rtx *op0, rtx *op1)
 
   /* We might have been handed back a SUBREG.  Just to make things
      easy, force it into a REG.  */
-  if (!REG_P (*op0) && !CONST_INT_P (*op0))
+  if (!REG_P (*op0) && !CONST_INT_P (*op0) && INTEGRAL_MODE_P (GET_MODE (*op0)))
     *op0 = force_reg (word_mode, *op0);
-  if (!REG_P (*op1) && !CONST_INT_P (*op1))
+  if (!REG_P (*op1) && !CONST_INT_P (*op1) && INTEGRAL_MODE_P (GET_MODE (*op1)))
     *op1 = force_reg (word_mode, *op1);
 }
 
@@ -14037,10 +13950,13 @@ riscv_c_mode_for_floating_type (enum tree_index ti)
   return default_mode_for_floating_type (ti);
 }
 
-/* This parses the attribute arguments to target_version in DECL and modifies
-   the feature mask and priority required to select those targets.  */
+/* Parse the attribute arguments to target_version in DECL and modify
+   the feature mask and priority required to select those targets.
+   If LOC is nonnull, report diagnostics against *LOC, otherwise
+   remain silent.  */
 static void
 parse_features_for_version (tree decl,
+			    location_t *loc,
 			    struct riscv_feature_bits &res,
 			    int &priority)
 {
@@ -14071,14 +13987,12 @@ parse_features_for_version (tree decl,
   cl_target_option_restore (&global_options, &global_options_set,
 			    default_opts);
 
-  riscv_process_target_version_attr (TREE_VALUE (version_attr),
-				     DECL_SOURCE_LOCATION (decl));
+  riscv_process_target_version_attr (TREE_VALUE (version_attr), loc);
 
   priority = global_options.x_riscv_fmv_priority;
   const char *arch_string = global_options.x_riscv_arch_string;
   bool parse_res
-    = riscv_minimal_hwprobe_feature_bits (arch_string, &res,
-					  DECL_SOURCE_LOCATION (decl));
+    = riscv_minimal_hwprobe_feature_bits (arch_string, &res, loc);
   gcc_assert (parse_res);
 
   cl_target_option_restore (&global_options, &global_options_set,
@@ -14135,8 +14049,8 @@ riscv_compare_version_priority (tree decl1, tree decl2)
   struct riscv_feature_bits mask1, mask2;
   int prio1, prio2;
 
-  parse_features_for_version (decl1, mask1, prio1);
-  parse_features_for_version (decl2, mask2, prio2);
+  parse_features_for_version (decl1, nullptr, mask1, prio1);
+  parse_features_for_version (decl2, nullptr, mask2, prio2);
 
   return compare_fmv_features (mask1, mask2, prio1, prio2);
 }
@@ -14439,6 +14353,7 @@ dispatch_function_versions (tree dispatch_decl,
       version_info.version_decl = version_decl;
       // Get attribute string, parse it and find the right features.
       parse_features_for_version (version_decl,
+				  &DECL_SOURCE_LOCATION (version_decl),
 				  version_info.features,
 				  version_info.prio);
       function_versions.push_back (version_info);
@@ -15441,6 +15356,131 @@ synthesize_and (rtx operands[3])
   return true;
 }
 
+/* Synthesize OPERANDS[0] = OPERANDS[1] + OPERANDS[2].
+
+    OPERANDS[0] and OPERANDS[1] will be a REG and may be the same
+    REG.
+
+    OPERANDS[2] is a CONST_INT.
+
+    Return TRUE if the operation was fully synthesized and the caller
+    need not generate additional code.  Return FALSE if the operation
+    was not synthesized and the caller is responsible for emitting the
+    proper sequence.  */
+
+bool
+synthesize_add (rtx operands[3])
+{
+  /* Trivial cases that don't need synthesis.  */
+  if (SMALL_OPERAND (INTVAL (operands[2])))
+    return false;
+
+  int budget1 = riscv_const_insns (operands[2], true);
+  int budget2 = riscv_const_insns (GEN_INT (-INTVAL (operands[2])), true);
+
+  HOST_WIDE_INT ival = INTVAL (operands[2]);
+
+  /* If we can emit two addi insns then that's better than synthesizing
+     the constant into a temporary, then adding the temporary to the
+     other input.  The exception is when the constant can be loaded
+     in a single instruction which can issue whenever its convenient.  */
+  if (SUM_OF_TWO_S12 (ival) && budget1 >= 2)
+    {
+      HOST_WIDE_INT saturated = HOST_WIDE_INT_M1U << (IMM_BITS - 1);
+
+      if (ival >= 0)
+	saturated = ~saturated;
+
+      ival -= saturated;
+
+      rtx x = gen_rtx_PLUS (word_mode, operands[1], GEN_INT (saturated));
+      emit_insn (gen_rtx_SET (operands[0], x));
+      rtx output = gen_rtx_PLUS (word_mode, operands[0], GEN_INT (ival));
+      emit_insn (gen_rtx_SET (operands[0], output));
+      return true;
+    }
+
+  /* If we can shift the constant by 1, 2, or 3 bit positions
+     and the result is a cheaper constant, then do so.  */
+  ival = INTVAL (operands[2]);
+  if (TARGET_ZBA
+      && (((ival % 2) == 0 && budget1
+	   > riscv_const_insns (GEN_INT (ival >> 1), true))
+	   || ((ival % 4) == 0 && budget1
+	       > riscv_const_insns (GEN_INT (ival >> 2), true))
+	   || ((ival % 8) == 0 && budget1
+	       > riscv_const_insns (GEN_INT (ival >> 3), true))))
+    {
+      // Load the shifted constant into a temporary
+      int shct = ctz_hwi (ival);
+
+      /* We can handle shifting up to 3 bit positions via shNadd.  */
+      if (shct > 3)
+	shct = 3;
+
+      /* The adjusted constant may still need synthesis, so do not copy
+	 it directly into register.  Let the expander handle it.  */
+      rtx tmp = force_reg (word_mode, GEN_INT (ival >> shct));
+
+      /* Generate shift-add of temporary and operands[1]
+	 into the final destination.  */
+      rtx x = gen_rtx_ASHIFT (word_mode, tmp, GEN_INT (shct));
+      rtx output = gen_rtx_PLUS (word_mode, x, operands[1]);
+      emit_insn (gen_rtx_SET (operands[0], output));
+      return true;
+    }
+
+  /* If the negated constant is cheaper than the original, then negate
+     the constant and use sub.  */
+  if (budget2 < budget1)
+    {
+      // load -INTVAL (operands[2]) into a temporary
+      rtx tmp = force_reg (word_mode, GEN_INT (-INTVAL (operands[2])));
+
+      // subtract operads[2] from operands[1]
+      rtx output = gen_rtx_MINUS (word_mode, operands[1], tmp);
+      emit_insn (gen_rtx_SET (operands[0], output));
+      return true;
+    }
+
+  /* No add synthesis was found.  Synthesize the constant into
+     a temporary and use that.  */
+  rtx x = force_reg (word_mode, operands[2]);
+  x = gen_rtx_PLUS (word_mode, operands[1], x);
+  emit_insn (gen_rtx_SET (operands[0], x));
+  return true;
+}
+
+/*
+    HINT : argument specify the target cache
+
+    TODO : LOCALITY is unused.
+
+    Return the first operand of the associated PREF or PREFX insn.  */
+rtx
+riscv_prefetch_cookie (rtx hint, rtx locality)
+{
+  return (GEN_INT (INTVAL (hint)
+		   + CacheHint::DCACHE_HINT + INTVAL (locality) * 0));
+}
+
+/* Return true if X is a legitimate address with offset for prefetch.
+   MODE is the mode of the value being accessed.  */
+bool
+riscv_prefetch_offset_address_p (rtx x, machine_mode mode)
+{
+  struct riscv_address_info addr;
+
+  if (riscv_classify_address (&addr, x, mode, false)
+      && addr.type == ADDRESS_REG)
+    {
+      if (TARGET_XMIPSCBOP)
+	return (CONST_INT_P (addr.offset)
+		&& MIPS_RISCV_9BIT_OFFSET_P (INTVAL (addr.offset)));
+    }
+
+  return true;
+}
 
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP

@@ -971,11 +971,11 @@ turn_sign_bit_on(unsigned char *location)
   {
   if( internal_is_ebcdic )
     {
-    *location &= ~NUMERIC_DISPLAY_SIGN_BIT;
+    *location = (*location & 0xF) + 0xD0;
     }
   else
     {
-    *location |=  NUMERIC_DISPLAY_SIGN_BIT;
+    *location = (*location & 0xF) + 0x70;
     }
   }
 
@@ -984,11 +984,11 @@ turn_sign_bit_off(unsigned char *location)
   {
   if( internal_is_ebcdic )
     {
-    *location |=  NUMERIC_DISPLAY_SIGN_BIT;
+    *location = (*location & 0xF) + 0xF0;
     }
   else
     {
-    *location &= ~NUMERIC_DISPLAY_SIGN_BIT;
+    *location = (*location & 0xF) + 0x30;
     }
   }
 
@@ -1003,14 +1003,7 @@ is_sign_bit_on(char ch)
     }
   else
     {
-    if( internal_is_ebcdic )
-      {
-      retval = (ch & NUMERIC_DISPLAY_SIGN_BIT) == 0;
-      }
-    else
-      {
-      retval = (ch & NUMERIC_DISPLAY_SIGN_BIT) != 0;
-      }
+    retval = (ch & NUMERIC_DISPLAY_SIGN_BIT) != 0;
     }
   return retval;
   }
@@ -1572,8 +1565,8 @@ int128_to_field(cblc_field_t   *var,
             memset(location, 0, length);
             size_error = __gg__binary_to_string_internal(
                                            PTRCAST(char, location),
-                                           length > MAX_FIXED_POINT_DIGITS 
-                                                    ? MAX_FIXED_POINT_DIGITS 
+                                           length > MAX_FIXED_POINT_DIGITS
+                                                    ? MAX_FIXED_POINT_DIGITS
                                                     : length,
                                            value);
             break;
@@ -1581,6 +1574,9 @@ int128_to_field(cblc_field_t   *var,
           case FldNumericDisplay:
             if( var->attr & signable_e )
               {
+              /*  There is a regrettable plethora of possibilities, here. */
+
+
               // Things get exciting when a numeric-display value is signable
 
               if( var->attr & separate_e )
@@ -1592,7 +1588,8 @@ int128_to_field(cblc_field_t   *var,
                   // The sign character goes into the first location
                   size_error =
                     __gg__binary_to_string_internal(PTRCAST(char, location+1),
-                                                    length-1, value);
+                                                    length-1,
+                                                    value);
                   location[0] = sign_ch;
                   }
                 else
@@ -1606,12 +1603,21 @@ int128_to_field(cblc_field_t   *var,
                 }
               else
                 {
-                // The sign information is not separate, so we put it into
-                // the number
+                /*  The sign information is not separate.  The sign information
+                    goes into the first byte for LEADING, or the last byte for
+                    TRAILING.  For ASCII, the zone will be 0x30.  For EBCDIC,
+                    the the zone is 0xC0.  Those get modified, respectively, to
+                    0x70 and 0xD0 when the value is negative.  */
+
+                // First, convert the binary value to the correct-length string
                 size_error =
                   __gg__binary_to_string_internal(PTRCAST(char, location),
-                                                  length, value);
+                                                  length,
+                                                  value);
 
+                // Check for a size error on a negative value.  It conceivably
+                // was truncated down to zero, in which case we need to
+                // suppress this is_negative flag.
                 if( size_error && is_negative )
                   {
                   // If all of the digits are zero, then the result is zero, and
@@ -1627,27 +1633,28 @@ int128_to_field(cblc_field_t   *var,
                     }
                   }
 
+                unsigned char *sign_location =
+                  var->attr & leading_e ? location : location + length - 1;
+
+                if( internal_is_ebcdic )
+                  {
+                  // Change the sign location from 0xF0 to 0xC0.
+                  *sign_location &= (ZONE_SIGNED_EBCDIC + 0xF);
+                  }
+
                 if( is_negative )
                   {
-                  if( var->attr & leading_e )
-                    {
-                    // The sign bit goes into the first digit:
-                    turn_sign_bit_on(&location[0]);
-                    }
-                  else
-                    {
-                    // The sign bit goes into the last digit:
-                    turn_sign_bit_on(&location[length-1]);
-                    }
+                  *sign_location |= NUMERIC_DISPLAY_SIGN_BIT;
                   }
                 }
               }
             else
               {
               // It's a simple positive number
-              size_error = __gg__binary_to_string_internal( PTRCAST(char,
-                                                                    location),
-                           length, value);
+              size_error = __gg__binary_to_string_internal(
+                                                    PTRCAST(char, location),
+                                                    length,
+                                                    value);
               }
 
             break;
@@ -1724,12 +1731,12 @@ int128_to_field(cblc_field_t   *var,
 
             // Assume for the moment that the res
             unsigned char sign_nybble = 0;
-            if( var->attr & packed_no_sign_e ) 
+            if( var->attr & packed_no_sign_e )
               {
               // This is COMP-6 packed decimal, with no sign nybble
               sign_nybble = 0;
               }
-            else 
+            else
               {
               // This is COMP-3 packed decimal, so we need to make room to the
               // right of the final decimal digit for the sign nybble:
@@ -1763,7 +1770,7 @@ int128_to_field(cblc_field_t   *var,
 
             /*  We need to check if the value is too big, in case our caller
                 wants to check for the error condition.  In any event, we need
-                to make sure the value actually fits, because otherwise the 
+                to make sure the value actually fits, because otherwise the
                 result might have a bad high-place digit for a value with an
                 odd number of places. */
 
@@ -1773,7 +1780,7 @@ int128_to_field(cblc_field_t   *var,
 
             // We are now set up to do the conversion:
             __gg__binary_to_packed(location, digits, value);
-            
+
             // We can put the sign nybble into place at this point.  Note that
             // for COMP-6 numbers the sign_nybble value is zero, so the next
             // operation is harmless.
@@ -1985,10 +1992,8 @@ get_binary_value_local(  int                 *rdigits,
   {
   __int128 retval = 0;
 
-  unsigned char ch;
   switch( resolved_var->type )
     {
-#if 1
     case FldLiteralA :
       fprintf(stderr, "%s(): is trying to handle a FldLiteralA\n", __func__);
       abort();
@@ -1997,7 +2002,6 @@ get_binary_value_local(  int                 *rdigits,
                // resolved_length,
                // rdigits );
       break;
-#endif
 
     case FldGroup :
     case FldAlphanumeric :
@@ -2008,7 +2012,9 @@ get_binary_value_local(  int                 *rdigits,
                rdigits );
       break;
 
-    case FldNumericDisplay :
+    case FldNumericDisplay:
+      {
+      *rdigits = resolved_var->rdigits;
       if( resolved_location[resolved_length-1] == DEGENERATE_HIGH_VALUE )
         {
         // This is a degenerate case, which violates the language
@@ -2032,57 +2038,58 @@ get_binary_value_local(  int                 *rdigits,
 
         // Make it positive by turning off the highest order bit:
         (PTRCAST(unsigned char, &retval))[sizeof(retval)-1] = 0x3F;
-        *rdigits = resolved_var->rdigits;
         }
       else
         {
-        // Pick up the sign byte, and force our value to be positive
+        unsigned char *digits;
         unsigned char *sign_byte_location;
-        if(   (resolved_var->attr  & separate_e )
-           && (resolved_var->attr  & leading_e  ) )
+        int ndigits;
+        if( resolved_var->attr & signable_e )
           {
+          // Pick up the sign byte, and force our value to be positive
+          if(   (resolved_var->attr  & separate_e )
+             && (resolved_var->attr  & leading_e  ) )
+            {
+            // LEADING SEPARATE
+            digits             = resolved_location+1;
+            sign_byte_location = resolved_location;
+            ndigits = resolved_length - 1;
+            }
+          else if(    (resolved_var->attr & separate_e)
+                  && !(resolved_var->attr & leading_e ) )
+            {
+            // TRAILING SEPARATE
+            digits             = resolved_location;
+            sign_byte_location = resolved_location + resolved_length - 1;
+            ndigits = resolved_length - 1;
+            }
+          else if( (resolved_var->attr & leading_e) )
+            {
+            // LEADING
+            digits             = resolved_location;
+            sign_byte_location = resolved_location;
+            ndigits = resolved_length;
+            }
+          else // if( !(resolved_var->attr & leading_e) )
+            {
+            // TRAILING
+            digits             = resolved_location;
+            sign_byte_location = resolved_location + resolved_length - 1;
+            ndigits = resolved_length;
+            }
+          }
+        else
+          {
+          digits             = resolved_location;
           sign_byte_location = resolved_location;
-          ch = *sign_byte_location;
-          *sign_byte_location = internal_plus;
+          ndigits = resolved_length;
           }
-        else if(    (resolved_var->attr & separate_e)
-                && !(resolved_var->attr & leading_e ) )
-          {
-          sign_byte_location = resolved_location + resolved_length - 1;
-          ch = *sign_byte_location;
-          *sign_byte_location = internal_plus;
-          }
-        else if( (resolved_var->attr & leading_e) )
-          {
-          sign_byte_location = resolved_location;
-          ch = *sign_byte_location;
-          turn_sign_bit_off(sign_byte_location);
-          }
-        else // if( !(resolved_var->attr & leading_e) )
-          {
-          sign_byte_location = resolved_location + resolved_length - 1;
-          ch = *sign_byte_location;
-          turn_sign_bit_off(sign_byte_location);
-          }
-
-        // We know where the decimal point is because of rdigits.  Because
-        // we know that it a clean string of ASCII digits, we can use the
-        // dirty converter:
-        retval = __gg__dirty_to_binary_internal(PTRCAST(const char,
-                                                        resolved_location),
-                 resolved_length,
-                 rdigits );
-        *rdigits = resolved_var->rdigits;
-
-        // Restore the sign byte
-        *sign_byte_location = ch;
-
-        if( ch == internal_minus || is_sign_bit_on(ch) )
-          {
-          retval = -retval;
-          }
+        retval = __gg__numeric_display_to_binary(sign_byte_location,
+                                                 digits,
+                                                 ndigits);
         }
       break;
+      }
 
     case FldNumericEdited :
       retval = edited_to_binary(  PTRCAST(char, resolved_location),
@@ -2142,52 +2149,9 @@ get_binary_value_local(  int                 *rdigits,
 
     case FldPacked:
       {
-      static const unsigned char dp2bin[160] =
-        {
-        // This may not be the weirdest table I've ever created, but it is
-        // certainly a contender.  Given the packed decimal byte 0x23, it
-        // returns the equivalent decimal value of 23.
-        00, 01, 02, 03, 04, 05, 06, 07,  8,  9, 0, 0, 0, 0, 0, 0, // 0x00
-        10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 0, 0, 0, 0, 0, 0, // 0x10
-        20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 0, 0, 0, 0, 0, 0, // 0x20
-        30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 0, 0, 0, 0, 0, 0, // 0x30
-        40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 0, 0, 0, 0, 0, 0, // 0x40
-        50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 0, 0, 0, 0, 0, 0, // 0x50
-        60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 0, 0, 0, 0, 0, 0, // 0x60
-        70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 0, 0, 0, 0, 0, 0, // 0x70
-        80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 0, 0, 0, 0, 0, 0, // 0x80
-        90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 0, 0, 0, 0, 0, 0, // 0x90
-        };
-
-      if( resolved_var->attr & packed_no_sign_e )
-        {
-        // This is packed decimal without a sign nybble
-        retval = 0;
-        for(size_t i=0; i<resolved_var->capacity; i++)
-          {
-          retval *= 100;
-          retval += dp2bin[resolved_location[i]];
-          }
-        }
-      else
-        {
-        // This is packed decimal with a final sign nybble
-        retval = 0;
-        size_t imputed_length = (resolved_var->digits + 2)/2;
-        for(size_t i=0; i<imputed_length-1; i++)
-          {
-          retval *= 100;
-          retval += dp2bin[resolved_location[i]];
-          }
-        retval *= 10;
-        retval += resolved_location[imputed_length-1]>>4;
-        if(    (resolved_location[imputed_length-1]&0x0F) == 0x0D
-            || (resolved_location[imputed_length-1]&0x0F) == 0x0B )
-          {
-          retval = -retval;
-          }
-        }
-     *rdigits = resolved_var->rdigits;
+      *rdigits = resolved_var->rdigits;
+      retval = __gg__packed_to_binary(resolved_location,
+                                      resolved_length);
       break;
       }
     }
@@ -3024,6 +2988,47 @@ format_for_display_internal(char **dest,
 
     case FldNumericDisplay:
       {
+      // Because a NumericDisplay can have any damned thing as a character,
+      // we are going force things that aren't digits to display as '0'
+      static const uint8_t ascii_chars[256] =
+        {
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0x00
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0x10
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0x20
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '0', '0', '0', '0', '0', // 0x30
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0x40
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0x50
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0x60
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '0', '0', '0', '0', '0', // 0x70
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0x80
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0x90
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0xa0
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0xb0
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0xc0
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0xd0
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0xe0
+        '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', // 0xf0
+        };
+      static const uint8_t ebcdic_chars[256] =
+        {
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x00
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x10
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x20
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x30
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x40
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x50
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x60
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x70
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x80
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0x90
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0xa0
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0xb0
+        0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,0xf8,0xf9,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0xc0
+        0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,0xf8,0xf9,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0xd0
+        0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0xe0
+        0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,0xf8,0xf9,0xf0,0xf0,0xf0,0xf0,0xf0,0xf0, // 0xf0
+        } ;
+
       // We are going to make use of fact that a NumericDisplay's data is
       // almost already in the format we need.  We have to add a decimal point,
       // if necessary, in the right place, and we need to tack on leading or
@@ -3097,50 +3102,67 @@ format_for_display_internal(char **dest,
             }
           }
 
-          {//xxx
-          // copy over the characters to the left of the decimal point:
-          for(int i=0; i<ldigits; i++ )
+        // copy over the characters to the left of the decimal point:
+        for(int i=0; i<ldigits; i++ )
+          {
+          unsigned char ch = *running_location++;
+
+          // Welcome to COBOL.  We might be dealing with a HIGH-VALUE, which
+          // is usually, but not always 0xFF.  I am going to handle the 0xFF
+          // case.  When the programmer messes with HIGH-VALUE in the
+          // SPECIAL-NAMES ALPHABET clause, then it becomes their problem.
+
+          // But when it isn't HIGH-VALUE, we don't want to see the effects
+          // of the internal sign.
+          if( (*dest)[index-1] != (char)DEGENERATE_HIGH_VALUE )
             {
-            char ch = *running_location++;
+            // Another tricky thing, though, is that for various reasons
+            // the string of digits might not be digits.  There can be
+            // REDEFINES, or the middle of the number might have been changed
+            // with an INITIALIZE into spaces.  But we do want numbers to
+            // look like numbers.  So, we do what we can:
 
-            // The default HIGH-VALUE of 0xFF runs afoul of the
-            // NumericDisplay sign bit 0f 0x40 when running in
-            // ASCII mode.  The following test handles that problem
-            // when HIGH-VALUE is still 0xFF.  That HIGH-VALUE can
-            // be changed by the SPECIAL-NAMES ALPHABET clause. But
-
-            // I have decided that the onus of that problem is on
-            // the user.
-            if( (*dest)[index-1] != (char)DEGENERATE_HIGH_VALUE )
+            if( internal_is_ebcdic )
               {
-              turn_sign_bit_off( PTRCAST(unsigned char, &ch));
+              ch = ebcdic_chars[ch];
               }
-            (*dest)[index++] = ch;
+            else
+              {
+              ch = ascii_chars[ch];
+              }
             }
-          if( rdigits )
+          (*dest)[index++] = ch;
+          }
+        if( rdigits )
+          {
+          // Lay down a decimal point
+          (*dest)[index++] = ascii_to_internal(__gg__decimal_point);
+
+          if( ldigits < 0 )
             {
-            // Lay down a decimal point
-            (*dest)[index++] = ascii_to_internal(__gg__decimal_point);
-
-            if( ldigits < 0 )
+            // This is a scaled_e value, and we need that many zeroes:
+            for( int i=0; i<-ldigits; i++ )
               {
-              // This is a scaled_e value, and we need that many zeroes:
-              for( int i=0; i<-ldigits; i++ )
-                {
-                (*dest)[index++] = internal_zero;
-                }
+              (*dest)[index++] = internal_zero;
               }
+            }
 
-            // And the digits to the right
-            for(int i=0; i<rdigits; i++ )
-              {
-              char ch = *running_location++;
+          // And the digits to the right
+          for(int i=0; i<rdigits; i++ )
+            {
+            unsigned char ch = *running_location++;
               if( (*dest)[index-1] != (char)DEGENERATE_HIGH_VALUE )
                 {
-                turn_sign_bit_off(PTRCAST(unsigned char, &ch));
+              if( internal_is_ebcdic )
+                {
+                ch = ebcdic_chars[ch];
                 }
-              (*dest)[index++] = ch;
+              else
+                {
+                ch = ascii_chars[ch];
+                }
               }
+            (*dest)[index++] = ch;
             }
           }
         // At this point, for a 999PPP number, we need to tack on the zeroes
@@ -6715,7 +6737,7 @@ typedef struct normalized_operand
   {
   // These are the characters of the string.  When the field is NumericDisplay
   // any leading or trailing +/- characters are removed, and any embedded
-  // NUMERIC_DISPLAY_SIGN_BIT bits are removed.
+  // minus bits are removed.
   std::string the_characters;
   size_t offset;  // Usually zero.  One when there is a leading sign.
   size_t length;  // Usually the same as the original.  But it is one less
@@ -6778,7 +6800,7 @@ normalize_id( const cblc_field_t *refer,
       for( size_t i=retval.offset; i<retval.length; i++ )
         {
         // Because we are dealing with a NumericDisplay that might have
-        // the NUMERIC_DISPLAY_SIGN_BIT turned on, we need to mask it off
+        // the minus bit turned on, we need to mask it off
         unsigned char ch = data[i];
         turn_sign_bit_off(&ch);
         retval.the_characters += ch;
@@ -7475,10 +7497,8 @@ __gg__inspect_format_1(int backward, size_t integers[])
   // We are now set up to accomplish the data flow described
   // in the language specification.  We loop through the
   // the character positions in normalized_id_1:
-  const char *leftmost
-    = normalized_id_1.the_characters.c_str();
-  const char *rightmost
-    = leftmost + normalized_id_1.length;
+  const char *leftmost  = normalized_id_1.the_characters.c_str();
+  const char *rightmost = leftmost + normalized_id_1.length;
 
   while( leftmost < rightmost )
     {
@@ -7533,7 +7553,7 @@ __gg__inspect_format_1(int backward, size_t integers[])
             break;
 
           case bound_characters_e:
-            match = 1;
+            match = true;
             break;
 
           case bound_all_e:
@@ -13319,7 +13339,7 @@ int
 __gg__get_file_descriptor(const char *device)
   {
   int retval = open(device, O_WRONLY);
-  
+
   if( retval == -1 )
     {
     char *msg;
@@ -13335,7 +13355,7 @@ __gg__get_file_descriptor(const char *device)
       open_syslog(option, facility);
       syslog(priority, "%s", msg);
       }
-    
+
     // Open a new handle to /dev/stdout, since our caller will be closing it
     retval = open("/dev/stdout", O_WRONLY);
     }

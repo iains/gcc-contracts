@@ -198,6 +198,7 @@ enum scope_kind {
   sk_catch,	     /* A catch-block.  */
   sk_for,	     /* The scope of the variable declared in a
 			init-statement.  */
+  sk_template_for,   /* Ditto for expansion statements.  */
   sk_cond,	     /* The scope of the variable declared in the condition
 			of an if or switch statement.  */
   sk_stmt_expr,	     /* GNU statement expression block.  */
@@ -214,6 +215,7 @@ enum scope_kind {
 			"template <>", this scope is always empty.  */
   sk_transaction,    /* A synchronized or atomic statement.  */
   sk_omp,	     /* An OpenMP structured block.  */
+  sk_lambda,	     /* A lambda scope.  */
   sk_contract,	     /* A P2900 contract.  */
   sk_count	     /* Number of scope_kind enumerations.  */
 };

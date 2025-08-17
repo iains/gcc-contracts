@@ -722,7 +722,12 @@ vect_mark_stmts_to_be_vectorized (loop_vec_info loop_vinfo, bool *fatal)
 			     phi_info->stmt);
 
 	  if (vect_stmt_relevant_p (phi_info, loop_vinfo, &relevant, &live_p))
-	    vect_mark_relevant (&worklist, phi_info, relevant, live_p);
+	    {
+	      if (STMT_VINFO_DEF_TYPE (phi_info) == vect_unknown_def_type)
+		return opt_result::failure_at
+		  (*si, "not vectorized: unhandled relevant PHI: %G", *si);
+	      vect_mark_relevant (&worklist, phi_info, relevant, live_p);
+	    }
 	}
       for (si = gsi_after_labels (bb); !gsi_end_p (si); gsi_next (&si))
 	{
@@ -1479,7 +1484,7 @@ check_load_store_for_partial_vectors (loop_vec_info loop_vinfo, tree vectype,
       return;
     }
 
-  if (memory_access_type == VMAT_GATHER_SCATTER)
+  if (mat_gather_scatter_p (memory_access_type))
     {
       internal_fn ifn = (is_load
 			 ? IFN_MASK_GATHER_LOAD
@@ -1498,7 +1503,7 @@ check_load_store_for_partial_vectors (loop_vec_info loop_vinfo, tree vectype,
 						       gs_info->offset_vectype,
 						       gs_info->scale,
 						       elsvals)
-	       || gs_info->decl != NULL_TREE)
+	       || memory_access_type == VMAT_GATHER_SCATTER_LEGACY)
 	vect_record_loop_mask (loop_vinfo, masks, nvectors, vectype,
 			       scalar_mask);
       else
@@ -2018,7 +2023,6 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
     *memory_access_type = VMAT_STRIDED_SLP;
   else if (STMT_VINFO_GATHER_SCATTER_P (stmt_info))
     {
-      *memory_access_type = VMAT_GATHER_SCATTER;
       slp_tree offset_node = SLP_TREE_CHILDREN (slp_node)[0];
       tree offset_vectype = SLP_TREE_VECTYPE (offset_node);
       memset (gs_info, 0, sizeof (gather_scatter_info));
@@ -2035,7 +2039,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
 				    offset_vectype, gs_info->scale,
 				    &gs_info->ifn, &tem,
 				    elsvals))
-	/* GATHER_SCATTER_IFN_P.  */;
+	*memory_access_type = VMAT_GATHER_SCATTER_IFN;
       else if (vls_type == VLS_LOAD
 	       ? (targetm.vectorize.builtin_gather
 		  && (gs_info->decl
@@ -2049,7 +2053,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
 							     TREE_TYPE
 							       (offset_vectype),
 							     gs_info->scale))))
-	/* GATHER_SCATTER_LEGACY_P.  */;
+	*memory_access_type = VMAT_GATHER_SCATTER_LEGACY;
       else
 	{
 	  /* GATHER_SCATTER_EMULATED_P.  */
@@ -2065,6 +2069,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
 				 "gather.\n");
 	      return false;
 	    }
+	  *memory_access_type = VMAT_GATHER_SCATTER_EMULATED;
 	}
     }
   else
@@ -2316,15 +2321,14 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
       && vect_use_strided_gather_scatters_p (stmt_info, vectype, loop_vinfo,
 					     masked_p, gs_info, elsvals,
 					     group_size, single_element_p))
-    *memory_access_type = VMAT_GATHER_SCATTER;
+    *memory_access_type = VMAT_GATHER_SCATTER_IFN;
 
   if (*memory_access_type == VMAT_CONTIGUOUS_DOWN
       || *memory_access_type == VMAT_CONTIGUOUS_REVERSE)
     *poffset = neg_ldst_offset;
 
   if (*memory_access_type == VMAT_ELEMENTWISE
-      || (*memory_access_type == VMAT_GATHER_SCATTER
-	  && GATHER_SCATTER_LEGACY_P (*gs_info))
+      || *memory_access_type == VMAT_GATHER_SCATTER_LEGACY
       || *memory_access_type == VMAT_STRIDED_SLP
       || *memory_access_type == VMAT_INVARIANT)
     {
@@ -2333,7 +2337,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
     }
   else
     {
-      if (*memory_access_type == VMAT_GATHER_SCATTER
+      if (mat_gather_scatter_p (*memory_access_type)
 	  && !first_dr_info)
 	*misalignment = DR_MISALIGNMENT_UNKNOWN;
       else
@@ -2341,7 +2345,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
       *alignment_support_scheme
 	= vect_supportable_dr_alignment
 	   (vinfo, first_dr_info, vectype, *misalignment,
-	    *memory_access_type == VMAT_GATHER_SCATTER ? gs_info : nullptr);
+	    mat_gather_scatter_p (*memory_access_type));
     }
 
   if (overrun_p)
@@ -2375,7 +2379,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
   if (loop_vinfo
       && dr_safe_speculative_read_required (stmt_info)
       && LOOP_VINFO_EARLY_BREAKS (loop_vinfo)
-      && (*memory_access_type == VMAT_GATHER_SCATTER
+      && (mat_gather_scatter_p (*memory_access_type)
 	  || *memory_access_type == VMAT_STRIDED_SLP))
     {
       if (dump_enabled_p ())
@@ -2395,7 +2399,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
      vector iteration or force masking.  */
   if (dr_safe_speculative_read_required (stmt_info)
       && (*alignment_support_scheme == dr_aligned
-	  && *memory_access_type != VMAT_GATHER_SCATTER))
+	  && !mat_gather_scatter_p (*memory_access_type)))
     {
       /* We can only peel for loops, of course.  */
       gcc_checking_assert (loop_vinfo);
@@ -2993,7 +2997,7 @@ vect_get_loop_variant_data_ptr_increment (
   tree step = vect_dr_behavior (vinfo, dr_info)->step;
 
   /* gather/scatter never reach here.  */
-  gcc_assert (memory_access_type != VMAT_GATHER_SCATTER);
+  gcc_assert (!mat_gather_scatter_p (memory_access_type));
 
   /* When we support SELECT_VL pattern, we dynamic adjust
      the memory address by .SELECT_VL result.
@@ -7840,8 +7844,8 @@ vectorizable_store (vec_info *vinfo,
 	    return false;
 	}
       else if (memory_access_type != VMAT_LOAD_STORE_LANES
-	       && (memory_access_type != VMAT_GATHER_SCATTER
-		   || (GATHER_SCATTER_LEGACY_P (gs_info)
+	       && (!mat_gather_scatter_p (memory_access_type)
+		   || (memory_access_type == VMAT_GATHER_SCATTER_LEGACY
 		       && !VECTOR_BOOLEAN_TYPE_P (mask_vectype))))
 	{
 	  if (dump_enabled_p ())
@@ -7849,8 +7853,7 @@ vectorizable_store (vec_info *vinfo,
 			     "unsupported access type for masked store.\n");
 	  return false;
 	}
-      else if (memory_access_type == VMAT_GATHER_SCATTER
-	       && GATHER_SCATTER_EMULATED_P (gs_info))
+      else if (memory_access_type == VMAT_GATHER_SCATTER_EMULATED)
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -7868,7 +7871,7 @@ vectorizable_store (vec_info *vinfo,
 
   dr_vec_info *dr_info = STMT_VINFO_DR_INFO (stmt_info), *first_dr_info = NULL;
   grouped_store = (STMT_VINFO_GROUPED_ACCESS (stmt_info)
-		   && memory_access_type != VMAT_GATHER_SCATTER);
+		   && !mat_gather_scatter_p (memory_access_type));
   if (grouped_store)
     {
       first_stmt_info = DR_GROUP_FIRST_ELEMENT (stmt_info);
@@ -8282,7 +8285,7 @@ vectorizable_store (vec_info *vinfo,
       aggr_type = NULL_TREE;
       bump = NULL_TREE;
     }
-  else if (memory_access_type == VMAT_GATHER_SCATTER)
+  else if (mat_gather_scatter_p (memory_access_type))
     {
       aggr_type = elem_type;
       if (!costing_p)
@@ -8470,7 +8473,7 @@ vectorizable_store (vec_info *vinfo,
       return true;
     }
 
-  if (memory_access_type == VMAT_GATHER_SCATTER)
+  if (mat_gather_scatter_p (memory_access_type))
     {
       gcc_assert (!grouped_store);
       auto_vec<tree> vec_offsets;
@@ -8538,7 +8541,7 @@ vectorizable_store (vec_info *vinfo,
 
 	  unsigned align = get_object_alignment (DR_REF (first_dr_info->dr));
 	  tree alias_align_ptr = build_int_cst (ref_type, align);
-	  if (GATHER_SCATTER_IFN_P (gs_info))
+	  if (memory_access_type == VMAT_GATHER_SCATTER_IFN)
 	    {
 	      if (costing_p)
 		{
@@ -8608,7 +8611,7 @@ vectorizable_store (vec_info *vinfo,
 	      vect_finish_stmt_generation (vinfo, stmt_info, call, gsi);
 	      new_stmt = call;
 	    }
-	  else if (GATHER_SCATTER_LEGACY_P (gs_info))
+	  else if (memory_access_type == VMAT_GATHER_SCATTER_LEGACY)
 	    {
 	      /* The builtin decls path for scatter is legacy, x86 only.  */
 	      gcc_assert (nunits.is_constant ()
@@ -9395,7 +9398,7 @@ vectorizable_load (vec_info *vinfo,
      get_load_store_type.  */
   if (SLP_TREE_LOAD_PERMUTATION (slp_node).exists ()
       && !((memory_access_type == VMAT_ELEMENTWISE
-	    || memory_access_type == VMAT_GATHER_SCATTER)
+	    || mat_gather_scatter_p (memory_access_type))
 	   && SLP_TREE_LANES (slp_node) == 1))
     {
       slp_perm = true;
@@ -9457,15 +9460,14 @@ vectorizable_load (vec_info *vinfo,
 	    return false;
 	}
       else if (memory_access_type != VMAT_LOAD_STORE_LANES
-	       && memory_access_type != VMAT_GATHER_SCATTER)
+	       && !mat_gather_scatter_p (memory_access_type))
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
 			     "unsupported access type for masked load.\n");
 	  return false;
 	}
-      else if (memory_access_type == VMAT_GATHER_SCATTER
-	       && GATHER_SCATTER_EMULATED_P (gs_info))
+      else if (memory_access_type == VMAT_GATHER_SCATTER_EMULATED)
 	{
 	  if (dump_enabled_p ())
 	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
@@ -9507,7 +9509,7 @@ vectorizable_load (vec_info *vinfo,
 
       if (dump_enabled_p ()
 	  && memory_access_type != VMAT_ELEMENTWISE
-	  && memory_access_type != VMAT_GATHER_SCATTER
+	  && !mat_gather_scatter_p (memory_access_type)
 	  && memory_access_type != VMAT_STRIDED_SLP
 	  && memory_access_type != VMAT_INVARIANT
 	  && alignment_support_scheme != dr_aligned)
@@ -9943,7 +9945,7 @@ vectorizable_load (vec_info *vinfo,
       return true;
     }
 
-  if (memory_access_type == VMAT_GATHER_SCATTER)
+  if (mat_gather_scatter_p (memory_access_type))
     grouped_load = false;
 
   if (grouped_load
@@ -10039,7 +10041,7 @@ vectorizable_load (vec_info *vinfo,
   gcc_assert ((memory_access_type != VMAT_LOAD_STORE_LANES
 	       && !mask_node
 	       && !loop_masks)
-	      || memory_access_type == VMAT_GATHER_SCATTER
+	      || mat_gather_scatter_p (memory_access_type)
 	      || alignment_support_scheme == dr_aligned
 	      || alignment_support_scheme == dr_unaligned_supported);
 
@@ -10332,7 +10334,7 @@ vectorizable_load (vec_info *vinfo,
       return true;
     }
 
-  if (memory_access_type == VMAT_GATHER_SCATTER)
+  if (mat_gather_scatter_p (memory_access_type))
     {
       gcc_assert (!grouped_load && !slp_perm);
 
@@ -10387,7 +10389,7 @@ vectorizable_load (vec_info *vinfo,
 	  /* 2. Create the vector-load in the loop.  */
 	  unsigned align = get_object_alignment (DR_REF (first_dr_info->dr));
 	  tree alias_align_ptr = build_int_cst (ref_type, align);
-	  if (GATHER_SCATTER_IFN_P (gs_info))
+	  if (memory_access_type == VMAT_GATHER_SCATTER_IFN)
 	    {
 	      if (costing_p)
 		{
@@ -10462,7 +10464,7 @@ vectorizable_load (vec_info *vinfo,
 	      new_stmt = call;
 	      data_ref = NULL_TREE;
 	    }
-	  else if (GATHER_SCATTER_LEGACY_P (gs_info))
+	  else if (memory_access_type == VMAT_GATHER_SCATTER_LEGACY)
 	    {
 	      /* The builtin decls path for gather is legacy, x86 only.  */
 	      gcc_assert (!final_len && nunits.is_constant ());
@@ -12515,13 +12517,15 @@ vect_analyze_stmt (vec_info *vinfo,
         gcc_unreachable ();
     }
 
-  tree saved_vectype = STMT_VINFO_VECTYPE (stmt_info);
-  STMT_VINFO_VECTYPE (stmt_info) = SLP_TREE_VECTYPE (node);
+  if (! STMT_VINFO_DATA_REF (stmt_info))
+    STMT_VINFO_VECTYPE (stmt_info) = NULL_TREE;
+  else
+    STMT_VINFO_VECTYPE (stmt_info) = SLP_TREE_VECTYPE (node);
 
   if (STMT_VINFO_RELEVANT_P (stmt_info))
     {
       gcall *call = dyn_cast <gcall *> (stmt_info->stmt);
-      gcc_assert (STMT_VINFO_VECTYPE (stmt_info)
+      gcc_assert (SLP_TREE_VECTYPE (node)
 		  || gimple_code (stmt_info->stmt) == GIMPLE_COND
 		  || (call && gimple_call_lhs (call) == NULL_TREE));
     }
@@ -12589,8 +12593,6 @@ vect_analyze_stmt (vec_info *vinfo,
 
     }
 
-  STMT_VINFO_VECTYPE (stmt_info) = saved_vectype;
-
   if (!ok)
     return opt_result::failure_at (stmt_info->stmt,
 				   "not vectorized:"
@@ -12602,8 +12604,8 @@ vect_analyze_stmt (vec_info *vinfo,
   if (!bb_vinfo
       && SLP_TREE_TYPE (node) != reduc_vec_info_type
       && (SLP_TREE_TYPE (node) != lc_phi_info_type
-	  || STMT_VINFO_DEF_TYPE (stmt_info) == vect_internal_def)
-      && (!node->ldst_lanes || SLP_TREE_CODE (node) == VEC_PERM_EXPR)
+	  || SLP_TREE_DEF_TYPE (node) == vect_internal_def)
+      && (!node->ldst_lanes || SLP_TREE_PERMUTE_P (node))
       && !can_vectorize_live_stmts (as_a <loop_vec_info> (vinfo),
 				    node, node_instance,
 				    false, cost_vec))
@@ -12634,8 +12636,10 @@ vect_transform_stmt (vec_info *vinfo,
     dump_printf_loc (MSG_NOTE, vect_location,
 		     "------>vectorizing statement: %G", stmt_info->stmt);
 
-  tree saved_vectype = STMT_VINFO_VECTYPE (stmt_info);
-  STMT_VINFO_VECTYPE (stmt_info) = SLP_TREE_VECTYPE (slp_node);
+  if (! STMT_VINFO_DATA_REF (stmt_info))
+    STMT_VINFO_VECTYPE (stmt_info) = NULL_TREE;
+  else
+    STMT_VINFO_VECTYPE (stmt_info) = SLP_TREE_VECTYPE (slp_node);
 
   switch (SLP_TREE_TYPE (slp_node))
     {
@@ -12755,8 +12759,7 @@ vect_transform_stmt (vec_info *vinfo,
     }
 
   if (SLP_TREE_TYPE (slp_node) != store_vec_info_type
-      && (!slp_node->ldst_lanes
-	  || SLP_TREE_CODE (slp_node) == VEC_PERM_EXPR))
+      && (!slp_node->ldst_lanes || SLP_TREE_PERMUTE_P (slp_node)))
     {
       /* Handle stmts whose DEF is used outside the loop-nest that is
 	 being vectorized.  */
@@ -12764,8 +12767,6 @@ vect_transform_stmt (vec_info *vinfo,
 				       slp_node_instance, true, NULL);
       gcc_assert (done);
     }
-
-  STMT_VINFO_VECTYPE (stmt_info) = saved_vectype;
 
   return is_store;
 }
@@ -13228,7 +13229,7 @@ vect_is_simple_use (vec_info *vinfo, slp_tree slp_node,
 	}
       else
 	{
-	  gcc_assert (SLP_TREE_CODE (child) == VEC_PERM_EXPR);
+	  gcc_assert (SLP_TREE_PERMUTE_P (child));
 	  *op = error_mark_node;
 	  *dt = vect_internal_def;
 	  if (def_stmt_info_out)

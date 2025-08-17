@@ -4388,6 +4388,7 @@ loongarch_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 	    break;
 	  }
       else if (TARGET_RECIP_VEC_DIV
+	       && vectype
 	       && gimple_code (stmt_info->stmt) == GIMPLE_ASSIGN)
 	{
 	  machine_mode mode = TYPE_MODE (vectype);
@@ -10786,9 +10787,9 @@ loongarch_expand_vec_cmp (rtx operands[])
    to a fixed type.  */
 
 static machine_mode
-loongarch_promote_function_mode (const_tree type ATTRIBUTE_UNUSED,
+loongarch_promote_function_mode (const_tree type,
 				 machine_mode mode,
-				 int *punsignedp ATTRIBUTE_UNUSED,
+				 int *punsignedp,
 				 const_tree fntype ATTRIBUTE_UNUSED,
 				 int for_return ATTRIBUTE_UNUSED)
 {
@@ -11154,6 +11155,46 @@ loongarch_c_mode_for_suffix (char suffix)
   return VOIDmode;
 }
 
+/* Implement TARGET_C_BITINT_TYPE_INFO.
+   Return true if _BitInt(N) is supported and fill its details into *INFO.  */
+bool
+loongarch_bitint_type_info (int n, struct bitint_info *info)
+{
+  if (n <= 8)
+    info->limb_mode = QImode;
+  else if (n <= 16)
+    info->limb_mode = HImode;
+  else if (n <= 32)
+    info->limb_mode = SImode;
+  else if (n <= 64)
+    info->limb_mode = DImode;
+  else if (n <= 128)
+    info->limb_mode = TImode;
+  else
+    info->limb_mode = DImode;
+
+  info->abi_limb_mode = info->limb_mode;
+
+  if (n > 64)
+    info->abi_limb_mode = TImode;
+
+  info->big_endian = false;
+  info->extended = true;
+  return true;
+}
+
+/* Implement TARGET_COMPUTE_PRESSURE_CLASSES.  */
+
+static int
+loongarch_compute_pressure_classes (reg_class *classes)
+{
+  int i = 0;
+  classes[i++] = GENERAL_REGS;
+  classes[i++] = FP_REGS;
+  classes[i++] = FCC_REGS;
+  return i;
+}
+
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.half\t"
@@ -11427,6 +11468,12 @@ loongarch_c_mode_for_suffix (char suffix)
 
 #undef TARGET_C_MODE_FOR_SUFFIX
 #define TARGET_C_MODE_FOR_SUFFIX loongarch_c_mode_for_suffix
+
+#undef TARGET_C_BITINT_TYPE_INFO
+#define TARGET_C_BITINT_TYPE_INFO loongarch_bitint_type_info
+
+#undef TARGET_COMPUTE_PRESSURE_CLASSES
+#define TARGET_COMPUTE_PRESSURE_CLASSES loongarch_compute_pressure_classes
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

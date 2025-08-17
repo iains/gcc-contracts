@@ -572,9 +572,9 @@ poplevel_named_label_1 (named_label_entry **slot, cp_binding_level *bl)
 	  ent->in_stmt_expr = true;
 	  break;
 	case sk_block:
-	  if (level_for_constexpr_if (bl->level_chain))
+	  if (level_for_constexpr_if (obl))
 	    ent->in_constexpr_if = true;
-	  else if (level_for_consteval_if (bl->level_chain))
+	  else if (level_for_consteval_if (obl))
 	    ent->in_consteval_if = true;
 	  break;
 	default:
@@ -4342,7 +4342,19 @@ finish_case_label (location_t loc, tree low_value, tree high_value)
       tree label;
 
       /* For templates, just add the case label; we'll do semantic
-	 analysis at instantiation-time.  */
+	 analysis at instantiation-time.  But diagnose case labels
+	 in expansion statements with switch outside of it here.  */
+      if (in_expansion_stmt)
+	for (cp_binding_level *b = current_binding_level;
+	     b != switch_stack->level; b = b->level_chain)
+	  if (b->kind == sk_template_for && b->this_entity)
+	    {
+	      auto_diagnostic_group d;
+	      error ("jump to case label");
+	      inform (EXPR_LOCATION (b->this_entity),
+		      "  enters %<template for%> statement");
+	      return error_mark_node;
+	    }
       label = build_decl (loc, LABEL_DECL, NULL_TREE, void_type_node);
       return add_stmt (build_case_label (low_value, high_value, label));
     }
@@ -9654,13 +9666,17 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
    error has been diagnosed.  */
 
 static tree
-find_decomp_class_base (location_t loc, tree type, tree ret)
+find_decomp_class_base (location_t loc, tree type, tree ret,
+			tsubst_flags_t complain)
 {
   if (LAMBDA_TYPE_P (type))
     {
-      auto_diagnostic_group d;
-      error_at (loc, "cannot decompose lambda closure type %qT", type);
-      inform (location_of (type), "lambda declared here");
+      if (complain & tf_error)
+	{
+	  auto_diagnostic_group d;
+	  error_at (loc, "cannot decompose lambda closure type %qT", type);
+	  inform (location_of (type), "lambda declared here");
+	}
       return error_mark_node;
     }
 
@@ -9674,6 +9690,8 @@ find_decomp_class_base (location_t loc, tree type, tree ret)
       return type;
     else if (ANON_AGGR_TYPE_P (TREE_TYPE (field)))
       {
+	if ((complain & tf_error) == 0)
+	  return error_mark_node;
 	auto_diagnostic_group d;
 	if (TREE_CODE (TREE_TYPE (field)) == RECORD_TYPE)
 	  error_at (loc, "cannot decompose class type %qT because it has an "
@@ -9686,6 +9704,8 @@ find_decomp_class_base (location_t loc, tree type, tree ret)
       }
     else if (!accessible_p (type, field, true))
       {
+	if ((complain & tf_error) == 0)
+	  return error_mark_node;
 	auto_diagnostic_group d;
 	error_at (loc, "cannot decompose inaccessible member %qD of %qT",
 		  field, type);
@@ -9707,28 +9727,32 @@ find_decomp_class_base (location_t loc, tree type, tree ret)
        BINFO_BASE_ITERATE (binfo, i, base_binfo); i++)
     {
       auto_diagnostic_group d;
-      tree t = find_decomp_class_base (loc, TREE_TYPE (base_binfo), ret);
+      tree t = find_decomp_class_base (loc, TREE_TYPE (base_binfo), ret,
+				       complain);
       if (t == error_mark_node)
 	{
-	  inform (location_of (type), "in base class of %qT", type);
+	  if (complain & tf_error)
+	    inform (location_of (type), "in base class of %qT", type);
 	  return error_mark_node;
 	}
       if (t != NULL_TREE && t != ret)
 	{
 	  if (ret == type)
 	    {
-	      error_at (loc, "cannot decompose class type %qT: both it and "
-			     "its base class %qT have non-static data members",
-			type, t);
+	      if (complain & tf_error)
+		error_at (loc, "cannot decompose class type %qT: both it and "
+			       "its base class %qT have non-static data "
+			       "members", type, t);
 	      return error_mark_node;
 	    }
 	  else if (orig_ret != NULL_TREE)
 	    return t;
 	  else if (ret != NULL_TREE)
 	    {
-	      error_at (loc, "cannot decompose class type %qT: its base "
-			     "classes %qT and %qT have non-static data "
-			     "members", type, ret, t);
+	      if (complain & tf_error)
+		error_at (loc, "cannot decompose class type %qT: its base "
+			       "classes %qT and %qT have non-static data "
+			       "members", type, ret, t);
 	      return error_mark_node;
 	    }
 	  else
@@ -9759,7 +9783,7 @@ get_tuple_size (tree type)
   if (val == error_mark_node)
     return NULL_TREE;
   if (VAR_P (val) || TREE_CODE (val) == CONST_DECL)
-    val = maybe_constant_value (val);
+    val = maybe_constant_value (val, NULL_TREE, mce_true);
   if (TREE_CODE (val) == INTEGER_CST)
     return val;
   else
@@ -9891,17 +9915,132 @@ cp_maybe_mangle_decomp (tree decl, cp_decomp *decomp)
     }
 }
 
-/* Append #i to DECL_NAME (decl).  */
+/* Append #i to DECL_NAME (decl) or for name independent decls
+   clear DECL_NAME (decl).  */
 
 static void
 set_sb_pack_name (tree decl, unsigned HOST_WIDE_INT i)
 {
-  tree name = DECL_NAME (decl);
-  size_t len = IDENTIFIER_LENGTH (name) + 22;
-  char *n = XALLOCAVEC (char, len);
-  snprintf (n, len, "%s#" HOST_WIDE_INT_PRINT_UNSIGNED,
-	    IDENTIFIER_POINTER (name), i);
-  DECL_NAME (decl) = get_identifier (n);
+  if (name_independent_decl_p (decl))
+    /* Only "_" names are treated as name independent, "_#0" etc. is not and
+       because we pushdecl the individual decl elements of structured binding
+       pack, we could get redeclaration errors if there are 2 or more name
+       independent structured binding packs in the same scope.  */
+    DECL_NAME (decl) = NULL_TREE;
+  else
+    {
+      tree name = DECL_NAME (decl);
+      size_t len = IDENTIFIER_LENGTH (name) + 22;
+      char *n = XALLOCAVEC (char, len);
+      snprintf (n, len, "%s#" HOST_WIDE_INT_PRINT_UNSIGNED,
+		IDENTIFIER_POINTER (name), i);
+      DECL_NAME (decl) = get_identifier (n);
+    }
+}
+
+/* Return structured binding size of TYPE or -1 if erroneous.  */
+
+HOST_WIDE_INT
+cp_decomp_size (location_t loc, tree type, tsubst_flags_t complain)
+{
+  if (TYPE_REF_P (type))
+    {
+      type = complete_type (TREE_TYPE (type));
+      if (type == error_mark_node)
+	return -1;
+      if (!COMPLETE_TYPE_P (type))
+	{
+	  if (complain & tf_error)
+	    error_at (loc, "structured binding refers to incomplete type %qT",
+		      type);
+	  return -1;
+	}
+    }
+
+  unsigned HOST_WIDE_INT eltscnt = 0;
+  if (TREE_CODE (type) == ARRAY_TYPE)
+    {
+      if (TYPE_DOMAIN (type) == NULL_TREE)
+	{
+	  if (complain & tf_error)
+	    error_at (loc, "cannot decompose array of unknown bound %qT",
+		      type);
+	  return -1;
+	}
+      tree nelts = array_type_nelts_top (type);
+      if (nelts == error_mark_node)
+	return -1;
+      if (!tree_fits_shwi_p (nelts))
+	{
+	  if (complain & tf_error)
+	    error_at (loc, "cannot decompose variable length array %qT", type);
+	  return -1;
+	}
+      return tree_to_shwi (nelts);
+    }
+  /* 2 GNU extensions.  */
+  else if (TREE_CODE (type) == COMPLEX_TYPE)
+    return 2;
+  else if (TREE_CODE (type) == VECTOR_TYPE)
+    {
+      if (!TYPE_VECTOR_SUBPARTS (type).is_constant (&eltscnt))
+	{
+	  if (complain & tf_error)
+	    error_at (loc, "cannot decompose variable length vector %qT", type);
+	  return -1;
+	}
+      return eltscnt;
+    }
+  else if (tree tsize = get_tuple_size (type))
+    {
+      if (tsize == error_mark_node
+	  || !tree_fits_shwi_p (tsize)
+	  || tree_int_cst_sgn (tsize) < 0)
+	{
+	  if (complain & tf_error)
+	    error_at (loc, "%<std::tuple_size<%T>::value%> is not an integral "
+			   "constant expression", type);
+	  return -1;
+	}
+      return tree_to_shwi (tsize);
+    }
+  else if (TREE_CODE (type) == UNION_TYPE)
+    {
+      if (complain & tf_error)
+	error_at (loc, "cannot decompose union type %qT", type);
+      return -1;
+    }
+  else if (!CLASS_TYPE_P (type))
+    {
+      if (complain & tf_error)
+	error_at (loc, "cannot decompose non-array non-class type %qT", type);
+      return -1;
+    }
+  else if (processing_template_decl && complete_type (type) == error_mark_node)
+    return -1;
+  else if (!COMPLETE_TYPE_P (type))
+    {
+      if (complain & tf_error)
+	error_at (loc, "structured binding refers to incomplete class type "
+		  "%qT", type);
+      return -1;
+    }
+  else
+    {
+      tree btype = find_decomp_class_base (loc, type, NULL_TREE, complain);
+      if (btype == error_mark_node)
+	return -1;
+      else if (btype == NULL_TREE)
+	return 0;
+      for (tree field = TYPE_FIELDS (btype); field; field = TREE_CHAIN (field))
+	if (TREE_CODE (field) != FIELD_DECL
+	    || DECL_ARTIFICIAL (field)
+	    || DECL_UNNAMED_BIT_FIELD (field))
+	  continue;
+	else
+	  eltscnt++;
+      return eltscnt;
+    }
 }
 
 /* Finish a decomposition declaration.  DECL is the underlying declaration
@@ -10244,14 +10383,6 @@ cp_finish_decomp (tree decl, cp_decomp *decomp, bool test_p)
 			      "pack %qD", v[pack]);
 		      goto error_out;
 		    }
-		  if (j == 0
-		      && !processing_template_decl
-		      && TREE_STATIC (decl))
-		    {
-		      sorry_at (dloc, "mangling of structured binding pack "
-				      "elements not implemented yet");
-		      goto error_out;
-		    }
 		  maybe_push_decl (t);
 		  /* Save the decltype away before reference collapse.  */
 		  hash_map_safe_put<hm_ggc> (decomp_type_table, t, eltype);
@@ -10262,8 +10393,16 @@ cp_finish_decomp (tree decl, cp_decomp *decomp, bool test_p)
 		  if (!processing_template_decl)
 		    {
 		      copy_linkage (t, decl);
+		      tree name = DECL_NAME (t);
+		      if (TREE_STATIC (decl))
+			DECL_NAME (t) = DECL_NAME (v[pack]);
 		      cp_finish_decl (t, init, /*constexpr*/false,
 				      /*asm*/NULL_TREE, LOOKUP_NORMAL);
+		      if (TREE_STATIC (decl))
+			{
+			  DECL_ASSEMBLER_NAME (t);
+			  DECL_NAME (t) = name;
+			}
 		    }
 		}
 	      continue;
@@ -10330,7 +10469,8 @@ cp_finish_decomp (tree decl, cp_decomp *decomp, bool test_p)
 	     type);
   else
     {
-      tree btype = find_decomp_class_base (loc, type, NULL_TREE);
+      tree btype = find_decomp_class_base (loc, type, NULL_TREE,
+					   tf_warning_or_error);
       if (btype == error_mark_node)
 	goto error_out;
       else if (btype == NULL_TREE)
@@ -12898,6 +13038,88 @@ mark_inline_variable (tree decl, location_t loc)
 }
 
 
+/* Diagnose -Wnon-c-typedef-for-linkage pedwarn.  TYPE is the unnamed class
+   with a typedef name for linkage purposes with freshly updated TYPE_NAME,
+   ORIG is the anonymous TYPE_NAME before that change.  */
+
+static bool
+diagnose_non_c_class_typedef_for_linkage (tree type, tree orig)
+{
+  gcc_rich_location richloc (DECL_SOURCE_LOCATION (orig));
+  tree name = DECL_NAME (TYPE_NAME (type));
+  richloc.add_fixit_insert_before (IDENTIFIER_POINTER (name));
+  return pedwarn (&richloc, OPT_Wnon_c_typedef_for_linkage,
+		  "anonymous non-C-compatible type given name for linkage "
+		  "purposes by %<typedef%> declaration");
+}
+
+/* Diagnose -Wnon-c-typedef-for-linkage violations on T.  TYPE and ORIG
+   like for diagnose_non_c_class_typedef_for_linkage, T is initially equal
+   to TYPE but during recursion can be set to nested classes.  */
+
+static bool
+maybe_diagnose_non_c_class_typedef_for_linkage (tree type, tree orig, tree t)
+{
+  if (!BINFO_BASE_BINFOS (TYPE_BINFO (t))->is_empty ())
+    {
+      auto_diagnostic_group d;
+      if (diagnose_non_c_class_typedef_for_linkage (type, orig))
+	inform (DECL_SOURCE_LOCATION (TYPE_NAME (t)),
+		"type is not C-compatible because it has a base class");
+      return true;
+    }
+  for (tree field = TYPE_FIELDS (t); field; field = TREE_CHAIN (field))
+    switch (TREE_CODE (field))
+      {
+      case VAR_DECL:
+	/* static data members have been diagnosed already.  */
+	continue;
+      case FIELD_DECL:
+	if (DECL_INITIAL (field))
+	  {
+	    auto_diagnostic_group d;
+	    if (diagnose_non_c_class_typedef_for_linkage (type, orig))
+	      inform (DECL_SOURCE_LOCATION (field),
+		      "type is not C-compatible because %qD has default "
+		      "member initializer", field);
+	    return true;
+	  }
+	continue;
+      case CONST_DECL:
+	continue;
+      case TYPE_DECL:
+	if (DECL_SELF_REFERENCE_P (field))
+	  continue;
+	if (DECL_IMPLICIT_TYPEDEF_P (field))
+	  {
+	    if (TREE_CODE (TREE_TYPE (field)) == ENUMERAL_TYPE)
+	      continue;
+	    if (CLASS_TYPE_P (TREE_TYPE (field)))
+	      {
+		tree tf = TREE_TYPE (field);
+		if (maybe_diagnose_non_c_class_typedef_for_linkage (type, orig,
+								    tf))
+		  return true;
+		continue;
+	      }
+	  }
+	/* FALLTHRU */
+      case FUNCTION_DECL:
+      case TEMPLATE_DECL:
+	{
+	  auto_diagnostic_group d;
+	  if (diagnose_non_c_class_typedef_for_linkage (type, orig))
+	    inform (DECL_SOURCE_LOCATION (field),
+		    "type is not C-compatible because it contains %qD "
+		    "declaration", field);
+	  return true;
+	}
+      default:
+	break;
+      }
+  return false;
+}
+
 /* Assign a typedef-given name to a class or enumeration type declared
    as anonymous at first.  This was split out of grokdeclarator
    because it is also used in libcc1.  */
@@ -12905,7 +13127,8 @@ mark_inline_variable (tree decl, location_t loc)
 void
 name_unnamed_type (tree type, tree decl)
 {
-  gcc_assert (TYPE_UNNAMED_P (type));
+  gcc_assert (TYPE_UNNAMED_P (type)
+	      || enum_with_enumerator_for_linkage_p (type));
 
   /* Replace the anonymous decl with the real decl.  Be careful not to
      rename other typedefs (such as the self-reference) of type.  */
@@ -12923,12 +13146,16 @@ name_unnamed_type (tree type, tree decl)
   /* Adjust linkage now that we aren't unnamed anymore.  */
   reset_type_linkage (type);
 
+  if (CLASS_TYPE_P (type) && warn_non_c_typedef_for_linkage)
+    maybe_diagnose_non_c_class_typedef_for_linkage (type, orig, type);
+
   /* FIXME remangle member functions; member functions of a
      type with external linkage have external linkage.  */
 
   /* Check that our job is done, and that it would fail if we
      attempted to do it again.  */
-  gcc_assert (!TYPE_UNNAMED_P (type));
+  gcc_assert (!TYPE_UNNAMED_P (type)
+	      && !enum_with_enumerator_for_linkage_p (type));
 }
 
 /* Check that decltype(auto) was well-formed: only plain decltype(auto)
@@ -15181,7 +15408,10 @@ grokdeclarator (const cp_declarator *declarator,
 	  && unqualified_id
 	  && TYPE_NAME (type)
 	  && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
-	  && TYPE_UNNAMED_P (type)
+	  && (TYPE_UNNAMED_P (type)
+	      /* An enum may have previously used an enumerator for linkage
+		 purposes, but we want the typedef name to take priority.  */
+	      || enum_with_enumerator_for_linkage_p (type))
 	  && declspecs->type_definition_p
 	  && attributes_naming_typedef_ok (*attrlist)
 	  && cp_type_quals (type) == TYPE_UNQUALIFIED)
@@ -18024,6 +18254,18 @@ start_enum (tree name, tree enumtype, tree underlying_type,
     return enumtype;
 }
 
+/* Returns true if TYPE is an enum that uses an enumerator name for
+   linkage purposes.  */
+
+bool
+enum_with_enumerator_for_linkage_p (tree type)
+{
+  return (cxx_dialect >= cxx20
+	  && UNSCOPED_ENUM_P (type)
+	  && TYPE_ANON_P (type)
+	  && TYPE_VALUES (type));
+}
+
 /* After processing and defining all the values of an enumeration type,
    install their decls in the enumeration type.
    ENUMTYPE is the type object.  */
@@ -18253,6 +18495,11 @@ finish_enum_value_list (tree enumtype)
       /* TYPE_FIELDS needs fixup.  */
       fixup_type_variants (current_class_type);
     }
+
+  /* P2115: An unnamed enum uses the name of its first enumerator for
+     linkage purposes; reset the type linkage if that is the case.  */
+  if (enum_with_enumerator_for_linkage_p (enumtype))
+    reset_type_linkage (enumtype);
 
   /* Finish debugging output for this type.  */
   rest_of_type_compilation (enumtype, namespace_bindings_p ());
