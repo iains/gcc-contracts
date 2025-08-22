@@ -565,7 +565,7 @@ compute_concrete_semantic (tree contract)
 bool
 contract_any_deferred_p (tree contract_attr)
 {
-  for (; contract_attr; contract_attr = CONTRACT_CHAIN (contract_attr))
+  for (; contract_attr; contract_attr = NEXT_CONTRACT_ATTR (contract_attr))
     if (CONTRACT_CONDITION_DEFERRED_P (CONTRACT_STATEMENT (contract_attr)))
       return true;
   return false;
@@ -660,9 +660,11 @@ rebuild_postconditions (tree fndecl)
     return;
 
   tree type = TREE_TYPE (TREE_TYPE (fndecl));
-  tree attributes = DECL_CONTRACTS (fndecl);
+  tree attributes = flag_contracts_nonattr
+		    ? GET_FN_CONTRACT_SPECIFIERS (fndecl)
+		    : DECL_CONTRACT_ATTRS (fndecl);
 
-  for (; attributes ; attributes = CONTRACT_CHAIN (attributes))
+  for (; attributes ; attributes = NEXT_CONTRACT_ATTR (attributes))
     {
       tree contract = TREE_VALUE (TREE_VALUE (attributes));
       if (TREE_CODE (contract) != POSTCONDITION_STMT)
@@ -917,7 +919,7 @@ remove_contract_attributes (tree fndecl)
 void
 set_contract_attributes (tree fndecl, tree contracts)
 {
-  if (DECL_CONTRACTS(fndecl))
+  if (DECL_CONTRACT_ATTRS(fndecl))
     remove_contract_attributes (fndecl);
   tree attrs = chainon (DECL_ATTRIBUTES(fndecl), contracts);
   DECL_ATTRIBUTES (fndecl) = attrs;
@@ -928,20 +930,26 @@ set_contract_attributes (tree fndecl, tree contracts)
 
 void copy_deferred_contracts (tree srcdecl, tree destdecl)
 {
-  tree attrs = NULL_TREE;
-  tree contracts = DECL_CONTRACTS (srcdecl);
+  tree contracts = flag_contracts_nonattr
+		    ? GET_FN_CONTRACT_SPECIFIERS (srcdecl)
+		    : DECL_CONTRACT_ATTRS (srcdecl);
 
-  if (!contracts) return;
+  if (!contracts)
+    return;
 
   gcc_checking_assert(contract_any_deferred_p (contracts));
 
+  tree attrs = NULL_TREE;
   for (tree c = contracts; c; c = TREE_CHAIN (c))
     {
       if (!cxx_contract_attribute_p (c))
 	continue;
       attrs = tree_cons (TREE_PURPOSE (c), TREE_VALUE (c), attrs);
     }
-  set_contract_attributes (destdecl, nreverse (attrs));
+  if (flag_contracts_nonattr)
+    set_fn_contract_specifiers (destdecl, nreverse (attrs));
+  else
+    set_contract_attributes (destdecl, nreverse (attrs));
 }
 
 /* Returns the parameter corresponding to the return value of a guarded
@@ -1156,16 +1164,13 @@ contract_attribute_valid_p (tree attribute)
   return contract_valid_p (TREE_VALUE (TREE_VALUE (attribute)));
 }
 
-/* Compare the contract conditions of OLD_ATTR and NEW_ATTR. Returns false
-   if the conditions are equivalent, and true otherwise.  */
+/* Compare the contract conditions of OLD_CONTRACT and NEW_CONTRACT.
+   Returns false if the conditions are equivalent, and true otherwise.  */
 
 static bool
-check_for_mismatched_contracts (tree old_attr, tree new_attr,
-			       contract_matching_context ctx)
+mismatched_contracts_p (tree old_contract, tree new_contract,
+			contract_matching_context ctx)
 {
-  tree old_contract = CONTRACT_STATEMENT (old_attr);
-  tree new_contract = CONTRACT_STATEMENT (new_attr);
-
   /* Different kinds of contracts do not match.  */
   if (TREE_CODE (old_contract) != TREE_CODE (new_contract))
     {
@@ -1216,7 +1221,7 @@ check_for_mismatched_contracts (tree old_attr, tree new_attr,
    if the contracts match, and false if they differ.  */
 
 bool
-match_contract_conditions (location_t oldloc, tree old_attrs,
+match_contract_attributes (location_t oldloc, tree old_attrs,
 			   location_t newloc, tree new_attrs,
 			   contract_matching_context ctx)
 {
@@ -1233,10 +1238,11 @@ match_contract_conditions (location_t oldloc, tree old_attrs,
 	  || !contract_attribute_valid_p (old_attrs))
 	return false;
 
-      if (check_for_mismatched_contracts (old_attrs, new_attrs, ctx))
+      if (mismatched_contracts_p (CONTRACT_STATEMENT (old_attrs),
+				  CONTRACT_STATEMENT (new_attrs), ctx))
 	return false;
-      old_attrs = CONTRACT_CHAIN (old_attrs);
-      new_attrs = CONTRACT_CHAIN (new_attrs);
+      old_attrs = NEXT_CONTRACT_ATTR (old_attrs);
+      new_attrs = NEXT_CONTRACT_ATTR (new_attrs);
     }
 
   /* If we didn't compare all attributes, the contracts don't match.  */
@@ -1303,7 +1309,11 @@ match_deferred_contracts (tree fndecl)
   if (!tp)
     return;
 
-  gcc_assert(!contract_any_deferred_p (DECL_CONTRACTS (fndecl)));
+  tree attributes = flag_contracts_nonattr
+		    ? GET_FN_CONTRACT_SPECIFIERS (fndecl)
+		    : DECL_CONTRACT_ATTRS (fndecl);
+
+  gcc_assert(!contract_any_deferred_p (attributes));
 
   processing_template_decl_sentinel ptds;
   processing_template_decl = uses_template_parms (fndecl);
@@ -1313,7 +1323,9 @@ match_deferred_contracts (tree fndecl)
     {
       tree new_contracts = TREE_VALUE (pending);
       location_t new_loc = CONTRACT_SOURCE_LOCATION (new_contracts);
-      tree old_contracts = DECL_CONTRACTS (fndecl);
+      tree old_contracts = flag_contracts_nonattr
+		    ? GET_FN_CONTRACT_SPECIFIERS (fndecl)
+		    : DECL_CONTRACT_ATTRS (fndecl);
       location_t old_loc = CONTRACT_SOURCE_LOCATION (old_contracts);
       /* todo : this is suspicious : with P2900 we have a TREE_PURPOSE set
 	 despite the fact we no longer inherit the contracts from the base.
@@ -1322,7 +1334,7 @@ match_deferred_contracts (tree fndecl)
 	 This means the diagnostic may claim override even in case oF
 	 re declarations.  */
       tree base = TREE_PURPOSE (pending);
-      match_contract_conditions (new_loc, new_contracts,
+      match_contract_attributes (new_loc, new_contracts,
 				 old_loc, old_contracts,
 				 base ? cmc_override : cmc_declaration);
     }
@@ -1574,8 +1586,10 @@ contract_active_p (tree contract)
 static bool
 has_active_contract_condition (tree fndecl, tree_code c)
 {
-  for (tree as = DECL_CONTRACTS (fndecl) ; as != NULL_TREE;
-      as = CONTRACT_CHAIN (as))
+  tree as = flag_contracts_nonattr
+	    ? GET_FN_CONTRACT_SPECIFIERS (fndecl)
+	    : DECL_CONTRACT_ATTRS (fndecl);
+  for (; as != NULL_TREE; as = NEXT_CONTRACT_ATTR (as))
     {
       tree contract = TREE_VALUE (TREE_VALUE (as));
       if (TREE_CODE (contract) == c && contract_active_p (contract))
@@ -1604,10 +1618,13 @@ has_active_postconditions (tree fndecl)
    under the current build configuration.  */
 
 bool
-contract_any_active_p (tree contract)
+contract_any_active_p (tree fndecl)
 {
-  for (; contract != NULL_TREE; contract = CONTRACT_CHAIN (contract))
-    if (contract_active_p (TREE_VALUE (TREE_VALUE (contract))))
+  tree as = flag_contracts_nonattr
+	    ? GET_FN_CONTRACT_SPECIFIERS (fndecl)
+	    : DECL_CONTRACT_ATTRS (fndecl);
+  for (; as; as = NEXT_CONTRACT_ATTR (as))
+    if (contract_active_p (TREE_VALUE (TREE_VALUE (as))))
       return true;
   return false;
 }
@@ -1626,7 +1643,7 @@ handle_contracts_p (tree fndecl)
   return (flag_contracts
 	  && !processing_template_decl
 	  && (CONTRACT_HELPER (fndecl) == ldf_contract_none)
-	  && contract_any_active_p (DECL_CONTRACTS (fndecl)));
+	  && contract_any_active_p (fndecl));
 }
 
 /* Should we break out FNDECL pre/post contracts into separate functions?
@@ -2684,8 +2701,10 @@ static void
 remap_and_emit_conditions (tree fn, tree condfn, tree_code code)
 {
   gcc_assert (code == PRECONDITION_STMT || code == POSTCONDITION_STMT);
-  for (tree attr = DECL_CONTRACTS (fn); attr;
-       attr = CONTRACT_CHAIN (attr))
+  tree attr = flag_contracts_nonattr
+	      ? GET_FN_CONTRACT_SPECIFIERS (fn)
+	      : DECL_CONTRACT_ATTRS (fn);
+  for (; attr; attr = NEXT_CONTRACT_ATTR (attr))
     {
       tree contract = CONTRACT_STATEMENT (attr);
       if (TREE_CODE (contract) == code)
@@ -2807,7 +2826,11 @@ check_param_in_postcondition (tree decl, location_t location)
 void
 check_postconditions_in_redecl (tree olddecl, tree newdecl)
 {
-  if (!DECL_CONTRACTS (olddecl)) return;
+  tree attr = flag_contracts_nonattr
+	      ? GET_FN_CONTRACT_SPECIFIERS (olddecl)
+	      : DECL_CONTRACT_ATTRS (olddecl);
+  if (!attr)
+    return;
 
   tree t1 = FUNCTION_FIRST_USER_PARM (olddecl);
   tree t2 = FUNCTION_FIRST_USER_PARM (newdecl);
@@ -2906,7 +2929,7 @@ start_function_contracts (tree fndecl)
   /* Check that the user did not try to shadow a function parameter with the
      specified postcondition result name.  */
   if (flag_contracts_nonattr)
-    for (tree ca = DECL_CONTRACTS (fndecl); ca; ca = CONTRACT_CHAIN (ca))
+    for (tree ca = GET_FN_CONTRACT_SPECIFIERS (fndecl); ca; ca = TREE_CHAIN (ca))
       if (POSTCONDITION_P (CONTRACT_STATEMENT (ca)))
 	if (tree id = POSTCONDITION_IDENTIFIER (CONTRACT_STATEMENT (ca)))
 	  {
@@ -3013,27 +3036,20 @@ add_post_condition_fn_call (tree fndecl)
   finish_expr_stmt (call);
 }
 
-/* Returns a copy of FNDECL contracts. This is used when emiting a contract.
- If we were to emit the original contract tree, any folding of the contract
- condition would affect the original contract too. The original contract
- tree needs to be preserved in case it is used to apply to a different
- function (for inheritance or wrapping reasons). */
-
-tree
-copy_contracts (tree fndecl, contract_match_kind remap_kind = cmk_all )
+static tree
+copy_contracts_list (tree attr, tree fndecl,
+		     contract_match_kind remap_kind = cmk_all)
 {
   tree last = NULL_TREE, contract_attrs = NULL_TREE;
-  for (tree a = DECL_CONTRACTS (fndecl);
-      a != NULL_TREE;
-      a = CONTRACT_CHAIN (a))
+  for (; attr; attr = NEXT_CONTRACT_ATTR (attr))
     {
       if ((remap_kind == cmk_pre
-	   && (TREE_CODE (CONTRACT_STATEMENT (a)) == POSTCONDITION_STMT))
+	   && (TREE_CODE (CONTRACT_STATEMENT (attr)) == POSTCONDITION_STMT))
 	  || (remap_kind == cmk_post
-	      && (TREE_CODE (CONTRACT_STATEMENT (a)) == PRECONDITION_STMT)))
+	      && (TREE_CODE (CONTRACT_STATEMENT (attr)) == PRECONDITION_STMT)))
 	continue;
 
-      tree c = copy_node (a);
+      tree c = copy_node (attr);
       TREE_VALUE (c) = build_tree_list (TREE_PURPOSE (TREE_VALUE (c)),
 					copy_node (CONTRACT_STATEMENT (c)));
 
@@ -3074,8 +3090,22 @@ copy_contracts (tree fndecl, contract_match_kind remap_kind = cmk_all )
       if (!contract_attrs)
 	contract_attrs = c;
     }
-
   return contract_attrs;
+}
+
+/* Returns a copy of FNDECL contracts. This is used when emiting a contract.
+ If we were to emit the original contract tree, any folding of the contract
+ condition would affect the original contract too. The original contract
+ tree needs to be preserved in case it is used to apply to a different
+ function (for inheritance or wrapping reasons). */
+
+static tree
+copy_contracts (tree fndecl, contract_match_kind remap_kind = cmk_all)
+{
+  tree attr = flag_contracts_nonattr
+	      ? GET_FN_CONTRACT_SPECIFIERS (fndecl)
+	      : DECL_CONTRACT_ATTRS (fndecl);
+  return copy_contracts_list (attr, fndecl, remap_kind);
 }
 
 
@@ -3089,7 +3119,7 @@ apply_preconditions (tree fndecl)
   else
   {
     tree contract_copy = copy_contracts (fndecl, cmk_pre);
-    for (; contract_copy; contract_copy = CONTRACT_CHAIN (contract_copy))
+    for (; contract_copy; contract_copy = NEXT_CONTRACT_ATTR (contract_copy))
       emit_contract_attr (contract_copy);
   }
 }
@@ -3104,7 +3134,7 @@ apply_postconditions (tree fndecl)
   else
     {
       tree contract_copy = copy_contracts (fndecl, cmk_post);
-      for (; contract_copy; contract_copy = CONTRACT_CHAIN (contract_copy))
+      for (; contract_copy; contract_copy = NEXT_CONTRACT_ATTR (contract_copy))
 	emit_contract_attr (contract_copy);
     }
 }
@@ -3207,20 +3237,21 @@ maybe_apply_function_contracts (tree fndecl)
 
 tree
 copy_and_remap_contracts (tree dest, tree source,
-			  contract_match_kind remap_kind = cmk_all )
+			  contract_match_kind remap_kind)
 {
   tree last = NULL_TREE, contract_attrs = NULL_TREE;
-  for (tree a = DECL_CONTRACTS (source);
-      a != NULL_TREE;
-      a = CONTRACT_CHAIN (a))
+  tree attr = flag_contracts_nonattr
+	      ? GET_FN_CONTRACT_SPECIFIERS (source)
+	      : DECL_CONTRACT_ATTRS (source);
+  for (; attr; attr = NEXT_CONTRACT_ATTR (attr))
     {
       if ((remap_kind == cmk_pre
-	   && (TREE_CODE (CONTRACT_STATEMENT (a)) == POSTCONDITION_STMT))
+	   && (TREE_CODE (CONTRACT_STATEMENT (attr)) == POSTCONDITION_STMT))
 	  || (remap_kind == cmk_post
-	      && (TREE_CODE (CONTRACT_STATEMENT (a)) == PRECONDITION_STMT)))
+	      && (TREE_CODE (CONTRACT_STATEMENT (attr)) == PRECONDITION_STMT)))
 	continue;
 
-      tree c = copy_node (a);
+      tree c = copy_node (attr);
       TREE_VALUE (c) = build_tree_list (TREE_PURPOSE (TREE_VALUE (c)),
 					copy_node (CONTRACT_STATEMENT (c)));
 
@@ -3230,9 +3261,9 @@ copy_and_remap_contracts (tree dest, tree source,
       if (TREE_CODE (CONTRACT_STATEMENT (c)) == POSTCONDITION_STMT)
 	{
 	  tree oldvar = POSTCONDITION_IDENTIFIER (CONTRACT_STATEMENT (c));
-	  if (oldvar && oldvar!=error_mark_node)
+	  if (oldvar && oldvar != error_mark_node)
 	    {
-	      tree type = copy_node (oldvar);
+	      //tree type = copy_node (oldvar);
 	      DECL_CONTEXT (oldvar) = dest;
 	    }
 	}
@@ -3274,9 +3305,12 @@ finish_function_contracts (tree fndecl)
       && !DECL_CONTRACT_WRAPPER (fndecl))
     return;
 
-  for (tree ca = DECL_CONTRACTS (fndecl); ca; ca = CONTRACT_CHAIN (ca))
+  tree attr = flag_contracts_nonattr
+	      ? GET_FN_CONTRACT_SPECIFIERS (fndecl)
+	      : DECL_CONTRACT_ATTRS (fndecl);
+  for (; attr; attr = NEXT_CONTRACT_ATTR (attr))
     {
-      tree contract = CONTRACT_STATEMENT (ca);
+      tree contract = CONTRACT_STATEMENT (attr);
       if (!CONTRACT_CONDITION (contract)
 	  || CONTRACT_CONDITION (contract) == error_mark_node)
 	return;
@@ -3336,44 +3370,105 @@ get_contract_end_loc (tree contracts)
 struct contract_redecl
 {
   tree original_contracts;
-  location_t note_loc;
+  tree contract_specifiers;
   tree pending_list;
+  location_t note_loc;
 };
 
-static hash_map<tree_decl_hash, contract_redecl> redeclared_contracts;
+static GTY(()) hash_map<tree, contract_redecl> *redeclared_contracts;
 
-/* This is called from push decl, and is used to determine if two sets of
-    contract attributes match.  */
+/* Set the (maybe) parsed contract specifier LIST for DECL.  */
+
+void
+set_fn_contract_specifiers (tree decl, tree list)
+{
+  if (!decl || error_operand_p (decl))
+    return;
+
+  bool existed = false;
+  contract_redecl& rd
+    = hash_map_safe_get_or_insert<hm_ggc> (redeclared_contracts, decl, &existed);
+  if (!existed)
+    {
+      /* This is the first time we encountered this decl, save the contracts
+	 and supporting data; to compare redeclarations with.  */
+      rd.original_contracts = list;
+      location_t decl_loc = DECL_SOURCE_LOCATION (decl);
+      location_t cont_end = decl_loc;
+      if (list)
+	cont_end = get_contract_end_loc (list);
+      rd.note_loc = make_location (decl_loc, decl_loc, cont_end);
+    }
+  rd.contract_specifiers = list;
+}
+
+void
+update_fn_contract_specifiers (tree decl, tree list)
+{
+  if (!decl || error_operand_p (decl))
+    return;
+
+  bool existed = false;
+  contract_redecl& rd
+    = hash_map_safe_get_or_insert<hm_ggc> (redeclared_contracts, decl, &existed);
+  gcc_checking_assert (existed);
+  /* We might come here multiple times as we iterate through deferred contracts
+     on a decl, wait until they are all done and then copy.  */
+  if (!contract_any_deferred_p (list))
+    {
+      /* See above.  */
+      rd.original_contracts = copy_contracts_list (list, decl);
+      location_t decl_loc = DECL_SOURCE_LOCATION (decl);
+      location_t cont_end = decl_loc;
+      if (list)
+	cont_end = get_contract_end_loc (list);
+      rd.note_loc = make_location (decl_loc, decl_loc, cont_end);
+    }
+  rd.contract_specifiers = list;
+}
+
+void
+unset_fn_contract_specifiers (tree decl)
+{
+  if (contract_redecl *p = hash_map_safe_get (redeclared_contracts, decl))
+    {
+      p->contract_specifiers = NULL_TREE;
+      p->original_contracts = NULL_TREE;
+      p->pending_list = NULL_TREE;
+      redeclared_contracts->remove (decl);
+    }
+}
+
+/* Get the contract specifier list for this DECL if there is one.  */
+
+tree
+get_fn_contract_specifiers (tree decl)
+{
+  if (contract_redecl *p = hash_map_safe_get (redeclared_contracts, decl))
+    return p->contract_specifiers;
+  return NULL_TREE;
+}
+
+/* This is called via duplicate_decls, from pushdecl, and is used to determine
+   if two sets of contract attributes match.  */
 
 void
 p2900_check_redecl_contract (tree newdecl, tree olddecl)
 {
-  tree new_contracts = DECL_CONTRACTS (newdecl);
-  tree old_contracts = DECL_CONTRACTS (olddecl);
+  tree new_contracts = GET_FN_CONTRACT_SPECIFIERS (newdecl);
+  tree old_contracts = GET_FN_CONTRACT_SPECIFIERS (olddecl);
 
   if (!old_contracts && !new_contracts)
     return;
 
-  location_t old_loc = DECL_SOURCE_LOCATION (olddecl);
+  /* We should always be comparing with the 'first' declaration which should
+     have been recorded already (if it has contract specifiers).  However
+     if the new decl is trying to add contracts, that is an error and we do
+     not want to create a map entry yet.  */
+  contract_redecl *rdp = hash_map_safe_get (redeclared_contracts, olddecl);
+  gcc_checking_assert (rdp || !old_contracts);
+
   location_t new_loc = DECL_SOURCE_LOCATION (newdecl);
-
-  /* We should always be comparing with the 'first' declaration - however re-
-     declarations are merged in, so keep a record of the first one.  This will
-     also be needed when we process deferred contracts.  */
-  bool existed = false;
-  contract_redecl& rd = redeclared_contracts.get_or_insert (olddecl, &existed);
-  if (!existed && !contract_any_deferred_p (old_contracts))
-    {
-      /* We store a deep copy of the contracts so any further modification to the
-	contracts on the original decl does not affect comparison with future
-	declarations.  */
-      rd.original_contracts = copy_contracts(olddecl);
-      location_t cont_end = old_loc;
-      if (old_contracts)
-	cont_end = get_contract_end_loc (old_contracts);
-      rd.note_loc = make_location (old_loc, old_loc, cont_end);
-    }
-
   if (new_contracts && !old_contracts)
     {
       auto_diagnostic_group d;
@@ -3382,8 +3477,12 @@ p2900_check_redecl_contract (tree newdecl, tree olddecl)
       location_t cont_end = get_contract_end_loc (new_contracts);
       cont_end = make_location (new_loc, new_loc, cont_end);
       error_at (cont_end, "declaration adds contracts to %q#D", olddecl);
-      inform (rd.note_loc , "first declared here");
-
+      location_t old_loc;
+      if (rdp && rdp->note_loc)
+	old_loc = rdp->note_loc;
+      else
+	old_loc = DECL_SOURCE_LOCATION (olddecl);
+      inform (old_loc , "first declared here");
       return;
     }
 
@@ -3405,7 +3504,7 @@ p2900_check_redecl_contract (tree newdecl, tree olddecl)
 	defer_guarded_contract_match (olddecl, olddecl, old_contracts);
 	/* put the defered contracts on the olddecl so we parse it when
 	  we can.  */
-	copy_deferred_contracts(newdecl, olddecl);
+	copy_deferred_contracts (newdecl, olddecl);
     }
   else if (contract_any_deferred_p (old_contracts)
 	   || contract_any_deferred_p (new_contracts))
@@ -3417,11 +3516,12 @@ p2900_check_redecl_contract (tree newdecl, tree olddecl)
     }
   else
     {
+      gcc_checking_assert (old_contracts);
       location_t cont_end = get_contract_end_loc (new_contracts);
       cont_end = make_location (new_loc, new_loc, cont_end);
       /* We have two sets - they should match or we issue a diagnostic.  */
-      match_contract_conditions (rd.note_loc, rd.original_contracts, cont_end,
-				 new_contracts, cmc_declaration);
+      match_contract_attributes (rdp->note_loc, rdp->original_contracts,
+				 cont_end, new_contracts, cmc_declaration);
     }
 
   return;
@@ -3434,8 +3534,8 @@ void
 cxx2a_check_redecl_contract (tree newdecl, tree olddecl)
 {
 
-  tree old_contracts = DECL_CONTRACTS(olddecl);
-  tree new_contracts = DECL_CONTRACTS(newdecl);
+  tree old_contracts = DECL_CONTRACT_ATTRS(olddecl);
+  tree new_contracts = DECL_CONTRACT_ATTRS(newdecl);
 
   if (!old_contracts && !new_contracts)
     return;
@@ -3485,7 +3585,7 @@ cxx2a_check_redecl_contract (tree newdecl, tree olddecl)
 	     doesn't.  */
 	  }
       else
-	match_contract_conditions (old_loc, old_contracts, new_loc,
+	match_contract_attributes (old_loc, old_contracts, new_loc,
 				   new_contracts, cmc_declaration);
 
       return;
@@ -3556,8 +3656,12 @@ check_redecl_contract (tree newdecl, tree olddecl)
   definition. We need to update the contracts accordingly.  */
 void update_contract_arguments(tree srcdecl, tree destdecl)
 {
-  tree src_contracts = DECL_CONTRACTS (srcdecl);
-  tree dest_contracts = DECL_CONTRACTS (destdecl);
+  tree src_contracts = flag_contracts_nonattr
+	      ? GET_FN_CONTRACT_SPECIFIERS (srcdecl)
+	      : DECL_CONTRACT_ATTRS (srcdecl);
+  tree dest_contracts = flag_contracts_nonattr
+	      ? GET_FN_CONTRACT_SPECIFIERS (destdecl)
+	      : DECL_CONTRACT_ATTRS (destdecl);
 
   if (!src_contracts && !dest_contracts)
     return;
@@ -3589,7 +3693,7 @@ void update_contract_arguments(tree srcdecl, tree destdecl)
     {
       if (contract_any_deferred_p (dest_contracts))
 	{
-	  copy_deferred_contracts(destdecl, srcdecl);
+	  copy_deferred_contracts (destdecl, srcdecl);
 	  /* Nothing more to do here.  */
 	  return;
 	}
@@ -3703,7 +3807,7 @@ define_contract_wrapper_func (const tree& fndecl, const tree& wrapdecl, void*)
 
   /* FIXME: Maybe we should check if fndecl is still dependent?  */
 
-  gcc_checking_assert(!DECL_CONTRACTS (wrapdecl));
+  gcc_checking_assert(!DECL_HAS_CONTRACTS_P (wrapdecl));
   bool is_virtual = DECL_IOBJ_MEMBER_FUNCTION_P (fndecl)
 		    && DECL_VIRTUAL_P (fndecl);
   /* We check postconditions on virtual function calls or if postcondition
