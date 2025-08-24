@@ -1,3 +1,52 @@
+2025-08-23  Eczbek  <eczbek.void@gmail.com>
+
+	PR c++/116928
+	* parser.cc (cp_parser_braced_list): Set greater_than_is_operator_p.
+
+2025-08-23  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120499
+	* method.cc (synthesize_method): Set the instantiating module.
+
+2025-08-21  Jason Merrill  <jason@redhat.com>
+
+	PR c++/121068
+	* constexpr.cc (cxx_eval_store_expression): Allow clobber of a const
+	object.
+
+2025-08-21  Jason Merrill  <jason@redhat.com>
+
+	PR c++/120757
+	* pt.cc (tsubst_expr) [OFFSET_REF]: Don't tsubst the type.
+
+2025-08-20  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/121553
+	* name-lookup.cc (check_local_shadow): Check !is_normal_capture_proxy.
+
+2025-08-19  Ben Wu  <soggysocks206@gmail.com>
+
+	PR c++/120618
+	* parser.cc (cp_parser_compound_requirement): Set type to
+	NULL_TREE for invalid type-constraint.
+
+2025-08-19  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/121351
+	* class.cc (add_method): Use outer_template_args when
+	substituting outer template arguments into constraints.
+
+2025-08-19  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120195
+	* name-lookup.cc (do_nonmember_using_decl): Also handle change
+	in exportedness of a function.
+
+2025-08-18  Indu Bhagat  <indu.bhagat@oracle.com>
+
+	* typeck.cc (get_member_function_from_ptrfunc): Use
+	'sanitize_code_type' instead of 'unsigned int'.
+
 2025-08-17  Nathaniel Shead  <nathanieloshead@gmail.com>
 
 	PR c++/120503

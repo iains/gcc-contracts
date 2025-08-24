@@ -27589,6 +27589,10 @@ cp_parser_braced_list (cp_parser *parser, bool *non_constant_p /*=nullptr*/)
   location_t start_loc = cp_lexer_peek_token (parser->lexer)->location;
   auto oas = make_temp_override (parser->omp_array_section_p, false);
 
+  /* Within a brace-enclosed initializer list, a `>' token is always the
+     greater-than operator.  */
+  auto gto = make_temp_override (parser->greater_than_is_operator_p, true);
+
   /* Consume the `{' token.  */
   matching_braces braces;
   bool found_opening_brace = braces.require_open (parser);
@@ -34152,9 +34156,12 @@ cp_parser_compound_requirement (cp_parser *parser)
 	    }
 	}
       else
-	/* P1452R2 removed the trailing-return-type option.  */
-	error_at (type_loc,
-		  "return-type-requirement is not a type-constraint");
+	{
+	  /* P1452R2 removed the trailing-return-type option.  */
+	  error_at (type_loc,
+		    "return-type-requirement is not a type-constraint");
+	  type = NULL_TREE;
+	}
     }
 
   location_t loc = make_location (expr_token->location,

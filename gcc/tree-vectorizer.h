@@ -270,6 +270,26 @@ struct vect_simd_clone_data : vect_data {
   auto_vec<tree> simd_clone_info;
 };
 
+/* Analysis data from vectorizable_load and vectorizable_store for
+   load_vec_info_type and store_vec_info_type.  */
+struct vect_load_store_data : vect_data {
+  vect_load_store_data (vect_load_store_data &&other) = default;
+  vect_load_store_data () = default;
+  virtual ~vect_load_store_data () = default;
+
+  vect_memory_access_type memory_access_type;
+  dr_alignment_support alignment_support_scheme;
+  int misalignment;
+  internal_fn lanes_ifn; // VMAT_LOAD_STORE_LANES
+  poly_int64 poffset;
+  union {
+      internal_fn ifn;	// VMAT_GATHER_SCATTER_IFN
+      tree decl;	// VMAT_GATHER_SCATTER_DECL
+  } gs;
+  tree strided_offset_vectype; // VMAT_GATHER_SCATTER_IFN, originally strided
+  auto_vec<int> elsvals;
+};
+
 /* A computation tree of an SLP instance.  Each node corresponds to a group of
    stmts to be packed in a SIMD stmt.  */
 struct _slp_tree {
@@ -331,10 +351,6 @@ struct _slp_tree {
   bool avoid_stlf_fail;
 
   int vertex;
-
-  /* Classifies how the load or store is going to be implemented
-     for loop vectorization.  */
-  vect_memory_access_type memory_access_type;
 
   /* The kind of operation as determined by analysis and optional
      kind specific data.  */
@@ -427,11 +443,19 @@ public:
 #define SLP_TREE_REPRESENTATIVE(S)		 (S)->representative
 #define SLP_TREE_LANES(S)			 (S)->lanes
 #define SLP_TREE_CODE(S)			 (S)->code
-#define SLP_TREE_MEMORY_ACCESS_TYPE(S)		 (S)->memory_access_type
 #define SLP_TREE_TYPE(S)			 (S)->type
 #define SLP_TREE_GS_SCALE(S)			 (S)->gs_scale
 #define SLP_TREE_GS_BASE(S)			 (S)->gs_base
 #define SLP_TREE_PERMUTE_P(S)			 ((S)->code == VEC_PERM_EXPR)
+
+inline vect_memory_access_type
+SLP_TREE_MEMORY_ACCESS_TYPE (slp_tree node)
+{
+  if (SLP_TREE_TYPE (node) == load_vec_info_type
+      || SLP_TREE_TYPE (node) == store_vec_info_type)
+    return static_cast<vect_load_store_data *> (node->data)->memory_access_type;
+  return VMAT_UNINITIALIZED;
+}
 
 enum vect_partial_vector_style {
     vect_partial_vectors_none,
@@ -2671,11 +2695,11 @@ extern bool vect_transform_cycle_phi (loop_vec_info, stmt_vec_info,
 				      slp_tree, slp_instance);
 extern bool vectorizable_lc_phi (loop_vec_info, stmt_vec_info, slp_tree);
 extern bool vect_transform_lc_phi (loop_vec_info, stmt_vec_info, slp_tree);
-extern bool vectorizable_phi (vec_info *, stmt_vec_info, slp_tree,
+extern bool vectorizable_phi (bb_vec_info, stmt_vec_info, slp_tree,
 			      stmt_vector_for_cost *);
 extern bool vectorizable_recurr (loop_vec_info, stmt_vec_info,
 				  slp_tree, stmt_vector_for_cost *);
-extern bool vectorizable_early_exit (vec_info *, stmt_vec_info,
+extern bool vectorizable_early_exit (loop_vec_info, stmt_vec_info,
 				     gimple_stmt_iterator *,
 				     slp_tree, stmt_vector_for_cost *);
 extern bool vect_emulated_vector_p (tree);

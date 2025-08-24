@@ -205,15 +205,15 @@ bool flag_opts_finished
 
 ; What the sanitizer should instrument
 Variable
-unsigned int flag_sanitize
+sanitize_code_type flag_sanitize
 
 ; What sanitizers should recover from errors
 Variable
-unsigned int flag_sanitize_recover = (SANITIZE_UNDEFINED | SANITIZE_UNDEFINED_NONDEFAULT | SANITIZE_KERNEL_ADDRESS | SANITIZE_KERNEL_HWADDRESS) & ~(SANITIZE_UNREACHABLE | SANITIZE_RETURN)
+sanitize_code_type flag_sanitize_recover = (SANITIZE_UNDEFINED | SANITIZE_UNDEFINED_NONDEFAULT | SANITIZE_KERNEL_ADDRESS | SANITIZE_KERNEL_HWADDRESS) & ~(SANITIZE_UNREACHABLE | SANITIZE_RETURN)
 
 ; What sanitizers should use __builtin_trap () instead of runtime diagnostics
 Variable
-unsigned int flag_sanitize_trap
+sanitize_code_type flag_sanitize_trap
 
 ; Flag whether a prefix has been added to dump_base_name
 Variable
@@ -1631,6 +1631,13 @@ Show location information when showing nested diagnostics.
 fdiagnostics-show-nesting-levels
 Common Var(flag_diagnostics_show_nesting_levels) Init(0)
 Show nesting levels as numbers when showing nested diagnostics.
+
+fdiagnostics-show-context
+Common Alias(fdiagnostics-show-context=,1,0)
+
+fdiagnostics-show-context=
+Common Joined RejectNegative UInteger Var(flag_diagnostics_show_context) Init(0)
+Collect and print more context information for diagnostics.
 
 fdisable-
 Common Joined RejectNegative Var(common_deferred_options) Defer

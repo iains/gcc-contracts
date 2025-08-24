@@ -1,3 +1,612 @@
+2025-08-23  Sam James  <sam@gentoo.org>
+
+	PR target/120933
+	* config.gcc (supported_defaults): Add tls for i386, x86_64.
+	* config/i386/i386.h (OPTION_DEFAULT_SPECS): Add tls.
+	* doc/install.texi: Document --with-tls= for i386, x86_64.
+
+2025-08-23  John Ericson  <git@JohnEricson.me>
+
+	* gcc.cc (for_each_path): templated, to make passing lambdas
+	possible/easy/safe, and to have a polymorphic return type.
+	(struct add_to_obstack_info): Deleted, lambda captures replace
+	it.
+	(add_to_obstack): Moved to lambda in build_search_list.
+	(build_search_list): Has above lambda now.
+	(struct file_at_path_info):  Deleted, lambda captures replace
+	it.
+	(file_at_path): Moved to lambda in find_a_file.
+	(find_a_file): Has above lambda now.
+	(struct spec_path_info): Reamed to just struct spec_path.
+	(struct spec_path): New name.
+	(spec_path): Rnamed to spec_path::operator()
+	(spec_path::operator()): New name
+	(do_spec_1): Updated for_each_path call sites.
+
+2025-08-22  Kishan Parmar  <kishan@linux.ibm.com>
+
+	PR target/118890
+	* config/rs6000/rs6000.cc (can_be_rotated_to_negative_lis): Add bounds
+	checks for shift counts to prevent undefined behavior.
+	(rs6000_emit_set_long_const): Likewise.
+
+2025-08-22  Jeff Law  <jlaw@ventanamicro.com>
+
+	PR rtl-optimization/120553
+	* ifcvt.cc (noce_try_sign_bit_splat): New function.
+	(noce_process_if_block): Use it.
+
+2025-08-22  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop.cc (vectorizable_live_operation): Pass
+	the representative of the PHIs node to
+	vect_create_epilog_for_reduction.
+
+2025-08-22  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop.cc (vectorizable_lane_reducing): Get
+	reduction info properly.  Adjust checks according to
+	comments.
+	(vectorizable_reduction): Do not set STMT_VINFO_REDUC_VECTYPE_IN
+	on the reduc info.
+	(vect_transform_reduction): Query STMT_VINFO_REDUC_VECTYPE_IN
+	on the actual reduction stmt, not the info.
+
+2025-08-22  Pan Li  <pan2.li@intel.com>
+
+	* match.pd: Add form 3 for unsigned SAT_MUL.
+
+2025-08-22  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/121635
+	* config/i386/i386-features.cc (ix86_emit_tls_call): Emit the
+	TLS call after NOTE_INSN_FUNCTION_BEG.
+
+2025-08-22  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop.cc (get_initial_defs_for_reduction): Adjust
+	comment.
+	(vect_create_epilog_for_reduction): Get at the reduction
+	kind via the instance, re-use the slp_reduc flag instead
+	of checking REDUC_GROUP_FIRST_ELEMENT again.
+	Remove unreachable code.
+	(vectorizable_reduction): Compute a reduc_chain flag from
+	the SLP instance kind, avoid REDUC_GROUP_FIRST_ELEMENT
+	checks.
+	(vect_transform_cycle_phi): Likewise.
+	(vectorizable_live_operation): Check the SLP instance
+	kind instead of REDUC_GROUP_FIRST_ELEMENT.
+
+2025-08-22  Richard Biener  <rguenther@suse.de>
+
+	* tree-parloops.cc (parloops_is_simple_reduction): Pass
+	in double reduction inner loop LC phis and query that.
+	(parloops_force_simple_reduction): Similar, but set it.
+	Check for valid reduction types here.
+	(valid_reduction_p): Remove.
+	(gather_scalar_reductions): Adjust, fixup double
+	reduction inner loop processing.
+
+2025-08-22  Sebastian Huber  <sebastian.huber@embedded-brains.de>
+
+	* config/riscv/t-rtems: Add -mstrict-align multilibs for
+	targets without support for misaligned access in hardware.
+
+2025-08-21  Dimitar Dimitrov  <dimitar@dinux.eu>
+
+	* config/pru/pru.cc (pru_init_libfuncs): Set softmpy libgcc
+	functions for optab multiplication entries if TARGET_OPT_MUL
+	option is not set.
+
+2025-08-21  Dimitar Dimitrov  <dimitar@dinux.eu>
+
+	* config.gcc: Include pru/t-multilib.
+	* config/pru/pru.h (MULTILIB_DEFAULTS): Define.
+	* config/pru/t-multilib: New file.
+
+2025-08-21  Dimitar Dimitrov  <dimitar@dinux.eu>
+
+	* common/config/pru/pru-common.cc (TARGET_DEFAULT_TARGET_FLAGS):
+	Keep multiplication, FILL and ZERO instructions enabled by
+	default.
+	* config/pru/pru.md (prumov<mode>): Gate code generation on
+	TARGET_OPT_FILLZERO.
+	(mov<mode>): Ditto.
+	(zero_extendqidi2): Ditto.
+	(zero_extendhidi2): Ditto.
+	(zero_extendsidi2): Ditto.
+	(@pru_ior_fillbytes<mode>): Ditto.
+	(@pru_and_zerobytes<mode>): Ditto.
+	(@<code>di3): Ditto.
+	(mulsi3): Gate code generation on TARGET_OPT_MUL.
+	* config/pru/pru.opt: Add mmul and mfillzero options.
+	* config/pru/pru.opt.urls: Regenerate.
+	* config/rl78/rl78.opt.urls: Regenerate.
+	* doc/invoke.texi: Document new options.
+
+2025-08-21  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/121619
+	* rtl-ssa/functions.h (function_info::commit_make_use_available):
+	Declare.
+	* rtl-ssa/blocks.cc (function_info::commit_make_use_available):
+	New function.
+	* rtl-ssa/changes.cc (function_info::apply_changes_to_insn): Use it.
+
+2025-08-21  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/111494
+	* gimple-fold.h (arith_code_with_undefined_signed_overflow): Declare.
+	* gimple-fold.cc (arith_code_with_undefined_signed_overflow): Export.
+	* tree-vect-stmts.cc (vectorizable_operation): Use unsigned
+	arithmetic for operations participating in a reduction.
+
+2025-08-21  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/121607
+	* config/i386/i386-features.cc (ix86_emit_tls_call): Emit the
+	TLS call after NOTE_INSN_BASIC_BLOCK in a basic block with only
+	a label.
+
+2025-08-21  Takayuki 'January June' Suwa  <jjsuwa_sys3175@yahoo.co.jp>
+
+	* config/xtensa/xtensa.md (*btrue_INT_MIN):
+	Change the branch insn condition to test for a negative number
+	rather than testing for the MSB.
+
+2025-08-21  Richard Biener  <rguenther@suse.de>
+
+	* tree-vectorizer.h (vectorizable_phi): Take bb_vec_info.
+	(vectorizable_early_exit): Take loop_vec_info.
+	* tree-vect-loop.cc (vectorizable_phi): Adjust.
+	* tree-vect-slp.cc (vect_slp_analyze_operations): Likewise.
+	(vectorize_slp_instance_root_stmt): Likewise.
+	* tree-vect-stmts.cc (vectorizable_early_exit): Likewise.
+	(vect_transform_stmt): Likewise.
+	(vect_analyze_stmt): Merge the sequences of vectorizable_*
+	where common.
+
+2025-08-20  Qing Zhao  <qing.zhao@oracle.com>
+
+	* common.opt.urls: Regenerate.
+
+2025-08-20  Qing Zhao  <qing.zhao@oracle.com>
+
+	PR tree-optimization/109071
+	PR tree-optimization/85788
+	PR tree-optimization/88771
+	PR tree-optimization/106762
+	PR tree-optimization/108770
+	PR tree-optimization/115274
+	PR tree-optimization/117179
+	* Makefile.in (OBJS): Add diagnostic-context-rich-location.o.
+	* common.opt (fdiagnostics-show-context): New option.
+	(fdiagnostics-show-context=): New option.
+	* diagnostic-context-rich-location.cc: New file.
+	* diagnostic-context-rich-location.h: New file.
+	* doc/invoke.texi (fdiagnostics-details): Add
+	documentation for the new options.
+	* gimple-array-bounds.cc (check_out_of_bounds_and_warn): Add
+	one new parameter. Use rich location with details for warning_at.
+	(array_bounds_checker::check_array_ref): Use rich location with
+	ditails for warning_at.
+	(array_bounds_checker::check_mem_ref): Add one new parameter.
+	Use rich location with details for warning_at.
+	(array_bounds_checker::check_addr_expr): Use rich location with
+	move_history_diagnostic_path for warning_at.
+	(array_bounds_checker::check_array_bounds): Call check_mem_ref with
+	one more parameter.
+	* gimple-array-bounds.h: Update prototype for check_mem_ref.
+	* gimple-ssa-warn-access.cc (warn_string_no_nul): Use rich location
+	with details for warning_at.
+	(maybe_warn_nonstring_arg): Likewise.
+	(maybe_warn_for_bound): Likewise.
+	(warn_for_access): Likewise.
+	(check_access): Likewise.
+	(pass_waccess::check_strncat): Likewise.
+	(pass_waccess::maybe_check_access_sizes): Likewise.
+	* gimple-ssa-warn-restrict.cc (pass_wrestrict::execute): Calculate
+	dominance info for diagnostics show context.
+	(maybe_diag_overlap): Use rich location with details for warning_at.
+	(maybe_diag_access_bounds): Use rich location with details for
+	warning_at.
+
+2025-08-20  Andrew Pinski  <andrew.pinski@oss.qualcomm.com>
+
+	PR tree-optimization/121568
+	* ipa-prop.h (build_ref_for_offset): Remove.
+	* tree-sra.cc (build_ref_for_offset): Make static.
+
+2025-08-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* config.gcc (aarch64*-*-*): Remove aarch64-cc-fusion.o from
+	extra_objs.
+	* config/aarch64/aarch64-passes.def (pass_cc_fusion): Delete.
+	* config/aarch64/aarch64-protos.h (make_pass_cc_fusion): Delete.
+	* config/aarch64/t-aarch64 (aarch64-cc-fusion.o): Delete.
+	* config/aarch64/aarch64-cc-fusion.cc: Delete.
+	* late-combine.cc (late_combine::optimizable_set): Take a set_info *
+	rather than an insn_info * and move destination tests from...
+	(late_combine::combine_into_uses): ...here. Take a set_info * rather
+	an insn_info *.  Take the rtx set.
+	(late_combine::parallelize_insns, late_combine::combine_cc_setter)
+	(late_combine::combine_insn): New member functions.
+	(late_combine::m_parallel): New member variable.
+	* rtlanal.cc (pattern_cost): Handle sets of CC registers in the
+	same way as comparisons.
+
+2025-08-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* rtl-ssa/blocks.cc (function_info::create_degenerate_phi): Fix
+	inverted test of bitmap_set_bit.  Call add_live_out_use even
+	if the register was previously live-out from the predecessor block.
+	Instead...
+	(function_info::add_live_out_use): ...check here whether a live-out
+	use already exists.
+
+2025-08-20  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* rtl-ssa/accesses.h (use_lookup): New class.
+	* rtl-ssa/functions.h (function_info::find_def): Expand comment.
+	(function_info::find_use): Declare.
+	* rtl-ssa/member-fns.inl (use_lookup::prev_use, use_lookup::next_use)
+	(use_lookup::matching_use, use_lookup::matching_or_prev_use)
+	(use_lookup::matching_or_next_use): New member functions.
+	* rtl-ssa/accesses.cc (function_info::find_use): Likewise.
+
+2025-08-20  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/114480
+	* cfganal.cc (compute_idf): Split processing of the initial
+	workset from the main iteration.  Use a vector for the
+	workset of the main iteration.
+
+2025-08-20  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/121608
+	* config/avr/specs.h (LINK_RELAX_SPEC): Wrap in %{!r...}.
+
+2025-08-20  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-slp.cc (vect_analyze_slp_reduc_chain): New,
+	copied from vect_analyze_slp_instance and only handle
+	slp_inst_kind_reduc_chain.  Inline vect_build_slp_instance.
+	(vect_analyze_slp_instance): Only handle slp_inst_kind_store.
+	Inline vect_build_slp_instance.
+	(vect_build_slp_instance): Remove now unused stmt_info parameter,
+	remove special code for store groups and reduction chains.
+	(vect_analyze_slp): Call vect_analyze_slp_reduc_chain
+	for reduction chain SLP build and adjust.
+
+2025-08-20  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-data-refs.cc (vect_check_gather_scatter):
+	Remove restriction on epilogue of epilogue vectorization.
+
+2025-08-20  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop.cc (update_epilogue_loop_vinfo): Remove
+	fixing up pattern stmt operands and gather/scatter DR_REFs.
+	(find_in_mapping): Remove.
+
+2025-08-20  Richard Biener  <rguenther@suse.de>
+
+	* tree-vectorizer.h (vect_load_store_data): New.
+	(_slp_tree::memory_access_type): Remove.
+	(SLP_TREE_MEMORY_ACCESS_TYPE): Turn into inline function.
+	* tree-vect-slp.cc (_slp_tree::_slp_tree): Do not
+	initialize SLP_TREE_MEMORY_ACCESS_TYPE.
+	* tree-vect-stmts.cc (check_load_store_for_partial_vectors):
+	Remove gather_scatter_info pointer argument, instead get
+	info from the SLP node.
+	(vect_build_one_gather_load_call): Get SLP node and builtin
+	decl as argument and remove uses of gather_scatter_info.
+	(vect_build_one_scatter_store_call): Likewise.
+	(vect_get_gather_scatter_ops): Remove uses of gather_scatter_info.
+	(vect_get_strided_load_store_ops): Get SLP node and remove
+	uses of gather_scatter_info.
+	(get_load_store_type): Take pointer to vect_load_store_data
+	instead of individual pointers.
+	(vectorizable_store): Adjust.  Re-use get_load_store_type
+	result from analysis time.
+	(vectorizable_load): Likewise.
+
+2025-08-20  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/121572
+	* config/i386/i386-features.cc (replace_tls_call): Add a bitmap
+	argument and put the updated TLS instruction in the bitmap.
+	(ix86_get_dominator_for_reg): New.
+	(ix86_check_flags_reg): Likewise.
+	(ix86_emit_tls_call): Likewise.
+	(ix86_place_single_tls_call): Add 2 bitmap arguments for updated
+	GNU and GNU2 TLS instructions.  Call ix86_emit_tls_call to emit
+	TLS instruction.  Correct debug dump for before instruction.
+
+2025-08-19  Andrew Pinski  <andrew.pinski@oss.qualcomm.com>
+
+	PR middle-end/120024
+	* calls.cc (expand_call): Remove start_sequence/end_sequence
+	for ECF_MALLOC.
+	Check valreg before deferencing it when it comes to malloc like
+	functions. Use the return value of emit_move_insn instead of
+	calling get_last_insn.
+
+2025-08-19  Richard Biener  <rguenther@suse.de>
+
+	* tree-parloops.cc (parloops_is_slp_reduction): Remove.
+	(parloops_is_simple_reduction): Do not call it.
+
+2025-08-19  Richard Biener  <rguenther@suse.de>
+
+	* tree-vect-loop.cc (vectorizable_reduction): Pass the
+	appropriate SLP node for costing of single-def-use-cycle
+	operations.
+	(vectorizable_live_operation): Pass the SLP node to the
+	costing hook.
+	* tree-vect-stmts.cc (vectorizable_bswap): Likewise.
+	(vectorizable_store): Likewise.
+
+2025-08-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121592
+	* tree-vect-slp.cc (vect_analyze_slp): When SLP reduction chain
+	discovery fails, fail overall when the tail of the chain
+	isn't also the entry for the non-SLP reduction.
+
+2025-08-19  Richard Biener  <rguenther@suse.de>
+
+	* config.gcc (riscv*-*-*): Look for python3, then fall back
+	to python.  Never use python2.
+
+2025-08-19  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/121527
+	* tree-sra.cc (build_access_from_expr_1): Do not strip an
+	outer VIEW_CONVERT_EXPR as it's relevant for the size of
+	the access.
+	(get_access_for_expr): Likewise.
+
+2025-08-19  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/121536
+	* config/aarch64/aarch64.cc (aarch64_bool_compound_p): Use
+	SLP_TREE_VECTYPE instead of STMT_VINFO_VECTYPE.
+	(aarch64_adjust_stmt_cost, aarch64_vector_costs::count_ops): Pass SLP
+	node to aarch64_bool_compound_p.
+
+2025-08-19  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/121536
+	* tree-vect-loop.cc (vectorizable_phi, vectorizable_recurr,
+	vectorizable_nonlinear_induction, vectorizable_induction): Pass slp_node
+	instead of stmt_info to record_stmt_cost.
+
+2025-08-19  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/121536
+	* config/aarch64/aarch64.cc (aarch64_vector_costs::add_stmt_cost): Set
+	vectype from type of lhs of gimple stmt.
+
+2025-08-18  Andrew Pinski  <andrew.pinski@oss.qualcomm.com>
+
+	PR middle-end/121581
+	* doc/extend.texi (__builtin_object_size): Fix example.
+
+2025-08-18  Indu Bhagat  <indu.bhagat@oracle.com>
+
+	* flag-types.h (sanitize_code_type): Define.
+	* asan.h (sanitize_flags_p): Use 'sanitize_code_type' instead of
+	'unsigned int'.
+	* common.opt: Likewise.
+	* dwarf2asm.cc (dw2_output_indirect_constant_1): Likewise.
+	* opts.cc (find_sanitizer_argument): Likewise.
+	(report_conflicting_sanitizer_options): Likewise.
+	(parse_sanitizer_options): Likewise.
+	(parse_no_sanitize_attribute): Likewise.
+	* opts.h (parse_sanitizer_options): Likewise.
+	(parse_no_sanitize_attribute): Likewise.
+	* tree-cfg.cc (print_no_sanitize_attr_value): Likewise.
+	* tree.cc (tree_fits_sanitize_code_type_p): Define.
+	(tree_to_sanitize_code_type): Likewise.
+	* tree.h (tree_fits_sanitize_code_type_p): Declare.
+	(tree_to_sanitize_code_type): Likewise.
+
+2025-08-18  Indu Bhagat  <indu.bhagat@oracle.com>
+
+	* config/aarch64/aarch64.md (MEMTAG_TAG_MASK): New define
+	constant.
+	(MEMTAG_ADDR_MASK): Likewise.
+	(irg, subp, ldg): Use new constants.
+
+2025-08-18  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR rtl-optimization/97497
+	* function-abi.h (predefined_function_abi::only_partial_reg_clobbers)
+	(function_abi::only_partial_reg_clobbers): New member functions.
+	* gcse-common.cc: Include regs.h and function-abi.h.
+	(compute_transp): Check for partially call-clobbered registers
+	and treat them as not being transparent in blocks with calls.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (UNSPEC_TI_FETCH_ADD): New unspec.
+	(UNSPEC_TI_FETCH_SUB): Likewise.
+	(UNSPEC_TI_FETCH_AND): Likewise.
+	(UNSPEC_TI_FETCH_XOR): Likewise.
+	(UNSPEC_TI_FETCH_OR): Likewise.
+	(UNSPEC_TI_FETCH_NAND_MASK_INVERTED): Likewise.
+	(ALL_SC): New define_mode_iterator.
+	(_scq): New define_mode_attr.
+	(atomic_fetch_nand<mode>): Accept ALL_SC instead of only GPR.
+	(UNSPEC_TI_FETCH_DIRECT): New define_int_iterator.
+	(UNSPEC_TI_FETCH): New define_int_iterator.
+	(amop_ti_fetch): New define_int_attr.
+	(size_ti_fetch): New define_int_attr.
+	(atomic_fetch_<amop_ti_fetch>ti_scq): New define_insn.
+	(atomic_fetch_<amop_ti_fetch>ti): New define_expand.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_exchangeti_scq): New
+	define_insn.
+	(atomic_exchangeti): New define_expand.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_compare_and_swapti_scq): New
+	define_insn.
+	(atomic_compare_and_swapti): New define_expand.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/loongarch.cc (loongarch_print_operand_reloc):
+	Accept "%t" for printing the number of the 64-bit machine
+	register holding the upper half of a TImode.
+	* config/loongarch/sync.md (atomic_storeti_scq): New
+	define_insn.
+	(atomic_storeti): expand to atomic_storeti_scq if !ISA_HAS_LSX.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/genopts/isa-evolution.in (scq): New evolution
+	feature.
+	* config/loongarch/loongarch-evolution.cc: Regenerate.
+	* config/loongarch/loongarch-evolution.h: Regenerate.
+	* config/loongarch/loongarch-str.h: Regenerate.
+	* config/loongarch/loongarch.opt: Regenerate.
+	* config/loongarch/loongarch.opt.urls: Regenerate.
+	* config/loongarch/loongarch-def.cc: Make -mscq the default for
+	-march=la664 and -march=la64v1.1.
+	* doc/invoke.texi (LoongArch Options): Document -m[no-]scq.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_storeti_lsx): New
+	define_insn.
+	(atomic_storeti): New define_expand.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_loadti_lsx): New define_insn.
+	(atomic_loadti): New define_expand.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md
+	(atomic_fetch_nand_mask_inverted<GPR:mode>): New define_insn.
+	(atomic_fetch_nand<GPR:mode>): New define_expand.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_fetch_sub<SHORT:mode>):
+	Disable if ISA_HAS_LAM_BH.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (UNSPEC_COMPARE_AND_SWAP_AND):
+	Remove.
+	(UNSPEC_COMPARE_AND_SWAP_XOR): Remove.
+	(UNSPEC_COMPARE_AND_SWAP_OR): Remove.
+	(atomic_test_and_set): Rename to ...
+	(atomic_fetch_<any_bitwise:amop><SHORT:mode>): ... this, and
+	adapt the expansion to use it for any bitwise operations and any
+	val, instead of just ior 1.
+	(atomic_test_and_set): New define_expand.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_test_and_set): Remove
+	unneeded andi instruction from the expansion.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/loongarch.cc (loongarch_print_operand_reloc):
+	Make "%T" output a comment marker if the operand is a memory
+	order for which the barrier won't be generated; remove "%t".
+	* config/loongarch/sync.md (atomic_cas_value_strong<mode>): Add
+	%T before "b 3f".
+	(atomic_cas_value_cmp_and_7_<mode>): Likewise.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (UNSPEC_COMPARE_AND_SWAP_AMCAS): New
+	UNSPEC code.
+	(atomic_cas_value_strong<mode>): NFC, update the comment to note
+	we only need to consider failure memory order.
+	(atomic_cas_value_strong<mode>_amcas): Use
+	UNSPEC_COMPARE_AND_SWAP_AMCAS instead of
+	UNSPEC_COMPARE_AND_SWAP.
+	(atomic_compare_and_swap<mode:GPR>): Pass failure memorder to
+	gen_atomic_cas_value_strong<mode>.
+	(atomic_compare_and_swap<mode:SHORT>): Pass failure memorder to
+	gen_atomic_cas_value_cmp_and_7_si.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_test_and_set): Use bstrins
+	for masking the address if possible.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_load<mode>): Remove "+" for
+	the memory operand.
+	(atomic_store<mode>): Use "=" instead of "+" for the memory
+	operand.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md: Use <size> instead of <amo>.
+	(amo): Remove.
+
+2025-08-18  Xi Ruoyao  <xry111@xry111.site>
+
+	* config/loongarch/sync.md (atomic_optab): Remove.
+	(atomic_<atomic_optab><mode>): Change atomic_optab to amop.
+	(atomic_fetch_<atomic_optab><mode>): Likewise.
+
+2025-08-17  Austin Law  <austinklaw@gmail.com>
+
+	PR target/121213
+	* config/riscv/sync.md (amo_atomic_exchange<mode>): Allow
+	(const_int 0) as input operand. Do not tie input to output.
+	No longer earlyclobber the output.
+
+2025-08-17  Artemiy Volkov  <artemiyv@acm.org>
+
+	* regrename.cc (scan_rtx_reg): Handle fused insn pairs.
+
+2025-08-17  Jan Dubiec  <jdx@o2.pl>
+
+	PR target/109324
+	* config/h8300/addsub.md: Explicitly specify mode for plus operation.
+	* config/h8300/jumpcall.md: Explicitly specify modes for eq and
+	match_operand operations.
+	* config/h8300/testcompare.md: Explicitly specify modes for eq, ltu
+	and compare operations.
+
+2025-08-17  Artemiy Volkov  <artemiyv@acm.org>
+
+	* ira-conflicts.cc (add_insn_allocno_copies): Handle fused insn pairs.
+	* rtl.h (single_output_fused_pair_p): Declare new function.
+	* rtlanal.cc (single_output_fused_pair_p): Define it.
+
+2025-08-17  Dimitar Dimitrov  <dimitar@dinux.eu>
+
+	PR target/121538
+	* config/riscv/arch-canonicalize (parse_dep_exts):
+	Match condition block up to closing brace.
+	(test_parse_long_condition_block): New test.
+
+2025-08-17  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/121541
+	* config/i386/i386-options.cc
+	(ix86_valid_target_attribute_inner_p): Add target("80387")
+	attribute.  Set the mask bit in opts_set->x_target_flags if the
+	mask bit in opts->x_target_flags is updated.
+	* doc/extend.texi: Document target("80387") function attribute.
+
 2025-08-17  Pan Li  <pan2.li@intel.com>
 
 	* config/riscv/autovec-opt.md: Add supported insn

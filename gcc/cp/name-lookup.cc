@@ -3355,7 +3355,8 @@ check_local_shadow (tree decl)
 		    && TREE_CODE (old) == PARM_DECL)
 		   /* We should also give an error for
 		       [x=1]{ int x; }  */
-		   || is_capture_proxy (old)))
+		   || (is_capture_proxy (old)
+		       && !is_normal_capture_proxy (old))))
 	{
 	  /* Go to where the parms should be and see if we find
 	     them there.  */
@@ -5358,7 +5359,8 @@ do_nonmember_using_decl (name_lookup &lookup, bool fn_scope_p,
 			OVL_EXPORT_P (old.get_using ()) = true;
 		    }
 		  else if (!DECL_LANG_SPECIFIC (inner)
-			   || !DECL_MODULE_PURVIEW_P (inner))
+			   || !DECL_MODULE_PURVIEW_P (inner)
+			   || (exporting_p && !DECL_MODULE_EXPORT_P (inner)))
 		    /* We need to re-insert this function as a revealed
 		       (possibly exported) declaration.  We can't remove
 		       the existing decl because that will change any
@@ -5380,7 +5382,8 @@ do_nonmember_using_decl (name_lookup &lookup, bool fn_scope_p,
 		  found = true;
 		  if (revealing_p
 		      && (!DECL_LANG_SPECIFIC (inner)
-			  || !DECL_MODULE_PURVIEW_P (inner)))
+			  || !DECL_MODULE_PURVIEW_P (inner)
+			  || (exporting_p && !DECL_MODULE_EXPORT_P (inner))))
 		    found = false;
 		  break;
 		}
