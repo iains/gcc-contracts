@@ -867,7 +867,7 @@ declare_handle_contract_violation ()
 /* Build the call to handle_contract_violation for VIOLATION.  */
 
 static void
-build_contract_handler_call (tree violation, bool noexcept_wrap = false)
+build_contract_handler_call (tree violation)
 {
   /* We may need to declare new types, ensure they are not considered
      attached to a named module.  */
@@ -876,9 +876,6 @@ build_contract_handler_call (tree violation, bool noexcept_wrap = false)
 
   tree violation_fn = declare_handle_contract_violation ();
   tree call = build_call_n (violation_fn, 1, violation);
-  if (flag_exceptions && noexcept_wrap
-      && !type_noexcept_p (TREE_TYPE (violation_fn)))
-    call = build2 (MUST_NOT_THROW_EXPR, void_type_node, call, NULL_TREE);
   finish_expr_stmt (call);
 }
 
@@ -1624,7 +1621,7 @@ build_contract_check_cxx2a (tree contract)
   if (semantic == CCS_NEVER || semantic == CCS_MAYBE)
     {
       tree violation = build_contract_violation (contract, /*is_const*/true);
-      build_contract_handler_call (build_address (violation), false);
+      build_contract_handler_call (build_address (violation));
     }
 
   if (semantic == CCS_QUICK)
@@ -2461,10 +2458,6 @@ get_evaluation_semantic (tree contract)
 	return CES_ENFORCE;
       case CCS_QUICK:
 	return CES_QUICK;
-      case CCS_NOEXCEPT_ENFORCE:
-	return CES_NOEXCEPT_ENFORCE;
-      case CCS_NOEXCEPT_OBSERVE:
-	return CES_NOEXCEPT_OBSERVE;
     }
 }
 
@@ -3613,27 +3606,12 @@ maybe_emit_violation_handler_wrappers ()
   finish_if_stmt (if_quick);
 
   /* We are going to call the handler.  */
-  cond = build2 (EQ_EXPR, uint16_type_node, semantic,
-		 build_int_cst (uint16_type_node, (uint16_t)CES_NOEXCEPT_ENFORCE));
-  cond = build2 (TRUTH_ORIF_EXPR, boolean_type_node, cond,
-		 build2 (EQ_EXPR, uint16_type_node, semantic,
-		 build_int_cst (uint16_type_node, (uint16_t)CES_NOEXCEPT_OBSERVE)));
-  tree if_noexcept = begin_if_stmt ();
-  finish_if_stmt_cond (cond, if_noexcept);
-  build_contract_handler_call (v, true);
-  finish_then_clause (if_noexcept);
-  begin_else_clause (if_noexcept);
-  build_contract_handler_call (v, false);
-  finish_else_clause (if_noexcept);
-  finish_if_stmt (if_noexcept);
+  build_contract_handler_call (v);
 
   tree if_observe = begin_if_stmt ();
   /* if (observe) return; */
   cond = build2 (EQ_EXPR, uint16_type_node, semantic,
 		 build_int_cst (uint16_type_node, (uint16_t)CES_OBSERVE));
-  cond = build2 (TRUTH_ORIF_EXPR, boolean_type_node, cond,
-		 build2 (EQ_EXPR, uint16_type_node, semantic,
-		 build_int_cst (uint16_type_node, (uint16_t)CES_NOEXCEPT_OBSERVE)));
   finish_if_stmt_cond (cond, if_observe);
   if (!flag_contract_disable_check_epochs)
     emit_builtin_observable ();
