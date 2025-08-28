@@ -1996,9 +1996,6 @@ Enum(contract_inheritance) String(none) Value(0)
 EnumValue
 Enum(contract_inheritance) String(P2900R13) Value(1)
 
-EnumValue
-Enum(contract_inheritance) String(P3653) Value(2)
-
 fcontracts-on-virtual-functions=
 C++ Joined RejectNegative Enum(contract_inheritance) Var(flag_contracts_on_virtual_functions) Init(0)
 -fcontracts-on-virtual-functions=[none|P2900R13] Select how contracts are inherited for virtual functions
