@@ -1967,10 +1967,6 @@ fcontract-disable-check-epochs
 C++ Var(flag_contract_disable_check_epochs) Init(0)
 -fcontract-disable-epoch-checks	Disable insertion of epoch markers after each contract check.
 
-Wsuggest-explicit-contract
-C++ ObjC++ Var(suggest_explicit_contract) Warning
-Warn about functions with implicitly inherited contracts.
-
 fcoroutines
 C++ LTO Var(flag_coroutines)
 Enable C++ coroutines (experimental).
